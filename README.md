@@ -2,7 +2,7 @@
 
 A Telegram bot for a group chat. Drop an Instagram, YouTube, X (Twitter) or Reddit link and it sends the video or photos back. It runs on a computer, Raspberry Pi or phone that you keep on, since YouTube and Instagram are far less likely to block a home connection than a cloud server.
 
-![logo](assets/logo-512.png)
+<img src="assets/logo-circle.png" width="140" alt="IGXYTDL logo">
 
 ## What it does
 
