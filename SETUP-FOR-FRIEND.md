@@ -109,7 +109,7 @@ Use a **throwaway Instagram account**, not your main one. The cookie file is a f
 - **Delete the original download** from your Downloads folder after you copy it.
 - **If it leaks or you stop using it:** change that account's password, then in Instagram open **Settings → Accounts Center → Password and security → Where you're logged in** and log out every session. That makes the exported cookies useless immediately. Then delete `cookies.txt` from the device.
 - **Remember what the bot does with the account:** every Instagram link sent in the group is fetched *as that account*. Posts from private accounts that the throwaway account follows can be downloaded by anyone in the group, and Instagram sees the activity from the host's internet connection. Follow nobody private with it.
-- **Only run code you trust.** A modified copy of the bot could send your cookies elsewhere. Get the code only from the repository or from the person who runs the group.
+- **Only run code you trust.** A modified copy of the bot could send your cookies elsewhere. Get the code only from the repository.
 
 ## Day to day
 
