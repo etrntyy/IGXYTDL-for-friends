@@ -1,0 +1,5 @@
+python-telegram-bot>=21.0
+yt-dlp
+python-dotenv
+Pillow
+static-ffmpeg

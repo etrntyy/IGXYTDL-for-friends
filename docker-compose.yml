@@ -1,0 +1,10 @@
+services:
+  bot:
+    build: .
+    restart: unless-stopped     # also starts again after the machine reboots
+    env_file: .env
+    environment:                # keep settings and cookies in ./data on the host
+      SETTINGS_FILE: /data/settings.json
+      COOKIES_FILE: /data/cookies.txt
+    volumes:
+      - ./data:/data
