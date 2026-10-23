@@ -85,15 +85,6 @@ Edit `.env` and start the bot with `./scripts/run-forever.sh`. To make it start 
 
 ## Raspberry Pi 4
 
-A 4 GB Pi 4 Model B is far more than the bot needs, and there's nothing to tune. What helps is the right hardware around it:
-
-- the official 5V 3A USB-C power supply, since weak chargers cause random crashes
-- a microSD card of 16 GB or more, A1 or A2 rated (a USB SSD lasts longer under heavy use but isn't required)
-- a network cable if you can, because it's steadier than Wi-Fi
-- a cheap heatsink or fan, so the Pi doesn't slow itself down when busy
-
-Getting it running:
-
 1. On another computer, install Raspberry Pi Imager from raspberrypi.com/software. Choose Raspberry Pi 4, then Raspberry Pi OS (other), then Raspberry Pi OS Lite (64-bit), then your card.
 2. Click Next, then Edit Settings. Set a hostname (`igxytdl-pi` is used below), a username and password, your Wi-Fi if you're not using a cable, and under Services turn on SSH with password login. Write the card.
 3. Put the card in the Pi, plug in network and power, and wait about two minutes. Then connect from your computer, with your own username in place of `YOURUSER`:
