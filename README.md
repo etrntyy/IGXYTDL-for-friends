@@ -32,7 +32,7 @@ If a few friends will host the same bot so it stays up when one device is off, r
 ## Good to know
 
 - Reddit needs a login now. Add free API keys (or cookies) and videos, images and galleries all work; the steps are in [INSTALL.md](INSTALL.md#reddit-access).
-- X photo tweets work with no setup. Instagram needs login cookies, covered in [INSTALL.md](INSTALL.md#instagram-login-cookies).
+- X photo and video tweets and YouTube videos work with no setup. Instagram needs login cookies, covered in [INSTALL.md](INSTALL.md#instagram-login-cookies).
 - To send files up to 2 GB instead of 50 MB, see [Files over 50 MB](INSTALL.md#files-over-50-mb). It only works on a single device, not together with shared hosting.
 - Set `ALLOWED_CHATS` so only your group can use the bot. The settings are explained in [INSTALL.md](INSTALL.md#the-settings-file).
 - Only download things you have the right to, and follow each site's terms.
