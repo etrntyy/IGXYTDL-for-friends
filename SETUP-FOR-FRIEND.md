@@ -7,7 +7,7 @@ You are going to keep a copy of the group's download bot running on your Raspber
 2. The **group ID** (a negative number like `-100…`).
 3. The code, as `igxytdl-for-friend.zip` or a GitHub invite.
 
-Instagram is optional. Without it your copy still handles YouTube, X and Reddit (Instagram links just fail while your Pi is the active host). If you want Instagram too, add **your own** cookies in the optional step below. Never ask anyone else for their Instagram cookies, and never share yours.
+For Instagram downloads you need your own login cookies (see the Instagram section below). YouTube, X and Reddit work without them, and Instagram links simply fail while your Pi is the active host and has no cookies. Never ask anyone else for their Instagram cookies, and never share yours.
 
 ---
 
@@ -78,7 +78,7 @@ Within a minute you should see a line saying this device is the active host, or 
 
 In the group, send `/host`. The bot answers **Running on: …** with the name of whichever device is currently active. To confirm yours works, ask the other host to stop theirs for a moment: `/host` should then show your `HOST_NAME` within about 90 seconds.
 
-## Optional: Instagram with your own login
+## Instagram downloads: your own login
 
 Use a **throwaway Instagram account**, not your main one. The cookie file is a full login for that account: anyone who has the file can act as that account until you log out of it or change its password.
 
@@ -118,7 +118,7 @@ Use a **throwaway Instagram account**, not your main one. The cookie file is a f
 | See what it's doing | `journalctl -u igxytdl -f` |
 | Restart | `sudo systemctl restart igxytdl` |
 | Stop | `sudo systemctl stop igxytdl` |
-| Update yt-dlp (do this if downloads break) | `cd ~/igxytdl && .venv/bin/pip install -U yt-dlp && sudo systemctl restart igxytdl` |
+| Force a yt-dlp update now (it also updates itself every day) | `cd ~/igxytdl && .venv/bin/pip install -U yt-dlp && sudo systemctl restart igxytdl` |
 
 ## Good to know
 

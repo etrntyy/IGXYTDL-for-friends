@@ -6,7 +6,7 @@ Step-by-step setup for **Windows**, **Linux** and the **Raspberry Pi 4 Model B (
 - [Windows 10 / 11](#windows-10--11)
 - [Linux (Ubuntu, Debian, Mint, Fedora, Arch)](#linux)
 - [Raspberry Pi 4 Model B, 4 GB](#raspberry-pi-4-model-b-4-gb)
-- [Instagram login cookies (optional)](#instagram-login-cookies-optional)
+- [Instagram login cookies](#instagram-login-cookies)
 - [Running on more than one device: who is active?](#running-on-more-than-one-device-who-is-active)
 - [The settings file (.env)](#the-settings-file-env)
 - [Updating, stopping, uninstalling](#updating-stopping-uninstalling)
@@ -25,7 +25,9 @@ You need four things:
 3. **Your group's ID.** Add the bot to your group and send `/id` there. It replies with a negative number such as `-1001234567890`.
 4. **The code.** Either `git clone` the repository, or download the ZIP from the repository page (**Code → Download ZIP**) and unzip it.
 
-Optional: your own Telegram user ID (send `/id` to the bot in a private chat) if you want to use the bot outside the group, and a cookies file if you want Instagram (see [Instagram login cookies](#instagram-login-cookies-optional)).
+Optional: your own Telegram user ID (send `/id` to the bot in a private chat) if you want to use the bot outside the group.
+
+For Instagram downloads you also need a cookies file (see [Instagram login cookies](#instagram-login-cookies)).
 
 You do **not** need to open any ports or change your router. The bot only makes outgoing connections.
 
@@ -204,12 +206,12 @@ Wait two minutes, then send `/start` to the bot again. If it answers, the Pi is 
 - Keep it plugged in, ideally by cable, in a spot with some airflow.
 - Under heavy use a heatsink or fan stops the Pi 4 from slowing itself down.
 - Heavy use writes temporary video files; a good card (or a USB SSD) lasts longer.
-- If downloads stop working, update yt-dlp first: see [Updating](#updating-stopping-uninstalling).
+- yt-dlp updates itself automatically. If downloads stop working anyway, force an update: see [Updating](#updating-stopping-uninstalling).
 - To use it on several devices at once, set `SHARED_HOSTING=1` and a different `HOST_NAME` on each ([HOSTING.md](HOSTING.md), section F).
 
 ---
 
-## Instagram login cookies (optional)
+## Instagram login cookies
 
 Instagram blocks almost every download unless the bot is "logged in". The bot cannot log in itself, so you give it a copy of a login session, called **cookies**, exported from your browser. YouTube, X and Reddit work without this.
 
@@ -291,7 +293,7 @@ The settings live in a file named `.env` in the bot's folder. The installer crea
 TELEGRAM_BOT_TOKEN=123456:ABC-DEF...     # required: from @BotFather
 ALLOWED_CHATS=-1001234567890             # only this group can use the bot
 ALLOWED_USERS=                           # optional: your Telegram user IDs, comma-separated, to also allow private chat
-COOKIES_FILE=                            # optional: full path to your Instagram cookies.txt
+COOKIES_FILE=                            # for Instagram downloads: full path to your Instagram cookies.txt
 HOST_NAME=igxytdl-pi                     # optional: name shown by /host
 SHARED_HOSTING=                          # set to 1 only if several devices run this bot with the same token
 ```
@@ -307,12 +309,23 @@ Notes:
 
 | | Windows | Linux / Raspberry Pi |
 |---|---|---|
-| **Update yt-dlp** (do this when downloads break) | `.venv\Scripts\pip install -U yt-dlp`, then restart `run.bat` | `cd ~/igxytdl && .venv/bin/pip install -U yt-dlp && sudo systemctl restart igxytdl` |
+| **Force a yt-dlp update now** (it also updates itself) | `.venv\Scripts\pip install -U yt-dlp`, then close and reopen `run.bat` | `cd ~/igxytdl && .venv/bin/pip install -U yt-dlp && sudo systemctl restart igxytdl` |
 | **Update the bot code** | Download the new ZIP, copy over your `.env` | `cd ~/igxytdl && git pull && .venv/bin/pip install -U -r requirements.txt && sudo systemctl restart igxytdl` |
 | **Stop** | Close the window or `Ctrl+C` | `sudo systemctl stop igxytdl` |
 | **Restart** | Close and double-click `run.bat` | `sudo systemctl restart igxytdl` |
 | **Logs** | The black window | `journalctl -u igxytdl -f` |
 | **Uninstall** | Delete the folder and the startup shortcut | `sudo systemctl disable --now igxytdl && sudo rm /etc/systemd/system/igxytdl.service`, then delete the folder |
+
+**Other systems, force a yt-dlp update:**
+- **Mac or Linux without the service:** `cd ~/igxytdl && .venv/bin/pip install -U yt-dlp`, then stop the bot (`Ctrl+C`) and start it again (`./scripts/run-forever.sh` restarts it by itself).
+- **Android (Termux):** `cd ~/igxytdl && pip install -U yt-dlp`, then stop (`Ctrl+C`) and start again.
+- **Docker:** `docker compose up -d --build` (or just `docker compose restart bot`; the bot updates yt-dlp when it starts).
+
+**Automatic yt-dlp updates.** YouTube and Instagram change often, so the bot keeps yt-dlp current on its own:
+- It runs `pip install -U yt-dlp` every time it starts.
+- It checks again every 24 hours. If a newer version was installed, it waits until no download is running, stops cleanly and starts itself again, so the new version is loaded. The service, `run.bat` or Docker are not involved in that restart.
+- It needs internet access and permission to install packages into its own folder. If the update fails (for example, no internet), it logs a warning and keeps running with the version it has.
+- Settings in `.env`: `AUTO_UPDATE_YTDLP=0` turns it off; `YTDLP_UPDATE_HOURS=12` changes how often it checks (`0` means only at start).
 
 ---
 
@@ -325,6 +338,6 @@ Notes:
 | Bot does not react to links in the group | Group Privacy is still on, the bot was not re-added after turning it off, or `ALLOWED_CHATS` has the wrong ID (send `/id` in the group). |
 | `Conflict: terminated by other getUpdates request` | Another copy is running with the same token. Stop it, or set `SHARED_HOSTING=1` on all copies. |
 | YouTube: "Sign in to confirm you're not a bot" | Update yt-dlp, try again later, or use a YouTube `cookies.txt`. |
-| Instagram: "empty media response" | Cookies are missing or expired. Export fresh ones ([Instagram login cookies](#instagram-login-cookies-optional)). |
+| Instagram: "empty media response" | Cookies are missing or expired. Export fresh ones ([Instagram login cookies](#instagram-login-cookies)). |
 | Videos over 50 MB are skipped | Telegram's limit for bots. The bot picks a lower quality automatically; very long videos may only fit at 360p or less. |
 | Service will not start (Linux/Pi) | Run `journalctl -u igxytdl -n 50` and read the last lines. A missing or wrong token in `.env` is the usual cause. |

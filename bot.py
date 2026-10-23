@@ -5,7 +5,10 @@ import logging
 import os
 import re
 import shutil
+import signal
 import socket
+import subprocess
+import sys
 import time
 import tempfile
 import threading
@@ -13,15 +16,39 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+def update_ytdlp() -> bool:
+    """Upgrade yt-dlp from PyPI (YouTube and Instagram change often); True if the installed version changed."""
+    from importlib import invalidate_caches, metadata
+
+    try:
+        before = metadata.version("yt-dlp")
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-U", "-q", "--disable-pip-version-check", "yt-dlp"],
+            check=True, capture_output=True, timeout=300,
+        )
+        invalidate_caches()
+        return metadata.version("yt-dlp") != before
+    except Exception as e:  # offline or pip blocked: keep running with what is installed
+        logging.getLogger("dlbot").warning("yt-dlp update skipped: %s", e)
+        return False
+
+
+AUTO_UPDATE = os.getenv("AUTO_UPDATE_YTDLP", "1") != "0"
+if AUTO_UPDATE:  # at every start, before yt-dlp is imported, so the fresh version is the one used
+    update_ytdlp()
+
 import httpx
 import yt_dlp
-from dotenv import load_dotenv
 from PIL import Image
 from telegram import BotCommand, InlineKeyboardButton, InputMediaPhoto, InputMediaVideo, InlineKeyboardMarkup, Update
 from telegram.constants import ChatAction
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
 
-load_dotenv()
 if not shutil.which("ffmpeg"):  # no system ffmpeg (e.g. no Homebrew): use the pip-bundled static build
     import static_ffmpeg
 
@@ -37,6 +64,8 @@ if _cookies_src and Path(_cookies_src).is_file():  # yt-dlp rewrites its cookie 
     shutil.copyfile(_cookies_src, COOKIES)
 ALLOWED = {int(x) for x in os.getenv("ALLOWED_USERS", "").split(",") if x.strip()}
 ALLOWED_CHATS = {int(x) for x in os.getenv("ALLOWED_CHATS", "").split(",") if x.strip()}  # group/chat IDs (groups are negative)
+UPDATE_HOURS = float(os.getenv("YTDLP_UPDATE_HOURS", "24"))  # 0 = only update at start
+RESTART = {"now": False, "downloads": 0}  # downloads in progress; restart waits until it is 0
 HOST_NAME = os.getenv("HOST_NAME") or socket.gethostname()  # shown by /host
 SHARED_HOSTING = os.getenv("SHARED_HOSTING") == "1"  # several devices share one token, one active at a time
 REDDIT_ID = os.getenv("REDDIT_CLIENT_ID")
@@ -373,6 +402,14 @@ def remember(ctx: ContextTypes.DEFAULT_TYPE, msg, url: str) -> None:
 
 
 async def run_download(ctx: ContextTypes.DEFAULT_TYPE, msg, url: str, fmt: str) -> None:
+    RESTART["downloads"] += 1
+    try:
+        await _run_download(ctx, msg, url, fmt)
+    finally:
+        RESTART["downloads"] -= 1
+
+
+async def _run_download(ctx: ContextTypes.DEFAULT_TYPE, msg, url: str, fmt: str) -> None:
     status = await msg.reply_text("Downloading…")
     tmp = Path(tempfile.mkdtemp(prefix="dlbot_"))
     try:
@@ -448,6 +485,20 @@ async def on_format(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await run_download(ctx, q.message, url, key)
 
 
+async def ytdlp_update_loop() -> None:
+    """Every UPDATE_HOURS: upgrade yt-dlp and, if it changed, restart the bot (when idle) so the new version loads."""
+    while UPDATE_HOURS > 0:
+        await asyncio.sleep(UPDATE_HOURS * 3600)
+        if not await asyncio.to_thread(update_ytdlp):
+            continue
+        log.info("yt-dlp updated; restarting once downloads finish")
+        while RESTART["downloads"]:
+            await asyncio.sleep(30)
+        RESTART["now"] = True
+        signal.raise_signal(signal.SIGINT)  # same graceful stop as Ctrl+C (shared hosting releases its claim)
+        return
+
+
 async def host_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(f"Running on: {HOST_NAME}")
 
@@ -484,6 +535,8 @@ def main() -> None:
     if API_BASE:
         builder = builder.base_url(f"{API_BASE}/bot").base_file_url(f"{API_BASE}/file/bot").local_mode(True)
     async def post_init(a: Application) -> None:
+        if AUTO_UPDATE:
+            a.bot_data["ytdlp_task"] = asyncio.create_task(ytdlp_update_loop())
         await a.bot.set_my_commands([
             BotCommand("autodownload", "Choose which sites download instantly"),
             BotCommand("audio", "Download a link's audio as MP3"),
@@ -504,6 +557,9 @@ def main() -> None:
         asyncio.run(hosting.run_with_failover(app, HOST_NAME))
     else:
         app.run_polling()
+    if RESTART["now"]:
+        log.info("restarting to load the new yt-dlp")
+        os.execv(sys.executable, [sys.executable] + sys.argv)
 
 
 if __name__ == "__main__":

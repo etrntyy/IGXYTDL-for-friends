@@ -15,7 +15,7 @@ The bot runs on any device that stays on and online. Instagram and YouTube work 
 TELEGRAM_BOT_TOKEN=123456:ABC...        # required
 ALLOWED_CHATS=-1001234567890            # only this group can use the bot
 ALLOWED_USERS=123456789                 # optional: also allow these people in private chat (get your ID with /id)
-COOKIES_FILE=/full/path/to/cookies.txt  # optional: Instagram login cookies (see INSTALL.md)
+COOKIES_FILE=/full/path/to/cookies.txt  # for Instagram downloads: login cookies (see INSTALL.md)
 ```
 
 Pick your device:
@@ -76,7 +76,7 @@ Three or four downloads at once fit comfortably. The real limit is your internet
 - **Cooling:** a cheap heatsink or small case fan stops the Pi 4 throttling under load. Idle, it stays cool.
 - **Storage:** a decent A1/A2 memory card is fine. A USB SSD lasts longer under heavy use but isn't required.
 - **Keep it online:** a wired network cable is more reliable than Wi-Fi. Restart the router if the bot goes silent after a power cut; the bot reconnects by itself.
-- **Updates:** if downloads break, update yt-dlp first (see the command above), since YouTube and Instagram change often.
+- **Updates:** yt-dlp updates itself automatically (at every start and once a day). If downloads still break, force an update now: on the Pi run `cd ~/igxytdl && .venv/bin/pip install -U yt-dlp && sudo systemctl restart igxytdl` (full list of commands for every system in [INSTALL.md](INSTALL.md#updating-stopping-uninstalling)).
 
 ## B. Android phone (Termux)
 
@@ -167,7 +167,7 @@ Idea: a few group members each run the bot on their own device. Whoever is onlin
 - **The token is full control of the bot.** Anyone who has it can read what the bot receives and act as the bot. Share it only with people you trust, and not in the group chat. If someone leaves the group, revoke the token in @BotFather (`/mybots` → API Token → Revoke) and send the new one to the remaining hosts.
 - **Failover is not instant.** If the active device crashes, links sent during the gap (up to about 90 seconds) wait and are handled when the next device takes over. If it shuts down normally, the handover takes under half a minute.
 - **Each device has its own settings.** `/autodownload` choices and Instagram cookies are stored on the device, so after a handover the bot may behave per that device's settings. Agree on the same choices, and give every host the same `.env`.
-- **Instagram cookies:** every host who wants Instagram needs their own `cookies.txt` from their own browser. Never share the file, use a throwaway account with 2FA turned on, and see the security recommendations in [INSTALL.md](INSTALL.md#instagram-login-cookies-optional) for what to do if it leaks.
+- **Instagram cookies:** every host who wants Instagram needs their own `cookies.txt` from their own browser. Never share the file, use a throwaway account with 2FA turned on, and see the security recommendations in [INSTALL.md](INSTALL.md#instagram-login-cookies) for what to do if it leaks.
 - **Downloads in progress** are lost if the device handling them goes offline; resend the link.
 - If Telegram refuses the marker the bot uses (the log says "lease unavailable"), it continues as a normal single bot without failover.
 
@@ -179,7 +179,7 @@ Idea: a few group members each run the bot on their own device. Whoever is onlin
 |---|---|
 | Bot doesn't react to links in the group | Group Privacy still on (see top), or the bot was not re-added after turning it off, or `ALLOWED_CHATS` has the wrong ID. |
 | `Conflict: terminated by other getUpdates request` in logs | Another copy is running with the same token. Stop it, or set `SHARED_HOSTING=1` on all of them. |
-| YouTube says "Sign in to confirm you're not a bot" | Update yt-dlp (`pip install -U yt-dlp`), try again later, or add a YouTube `cookies.txt`. |
+| YouTube says "Sign in to confirm you're not a bot" | Update yt-dlp (it updates itself daily; force it with the commands in [INSTALL.md](INSTALL.md#updating-stopping-uninstalling)), try again later, or add a YouTube `cookies.txt`. |
 | Instagram "empty media response" | Cookies missing, expired or from a logged-out session. Export them again. |
 | Files over 50 MB are skipped | Telegram's bot limit. A local Bot API server (`TELEGRAM_API_BASE`) raises it to 2 GB. |
 | Nothing works after a router/power cut | The device must reconnect to the internet; the service or `run-forever.sh` restarts the bot. |

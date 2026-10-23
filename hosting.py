@@ -77,6 +77,8 @@ async def run_with_failover(app, host_name: str) -> None:
             pass
 
     await app.initialize()
+    if app.post_init:  # PTB only runs this itself inside run_polling()
+        await app.post_init(app)
     await app.start()
     active, solo, last_ok = False, False, 0.0
     log.info("shared hosting: %s waiting for the lease", me)
