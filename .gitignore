@@ -4,3 +4,4 @@ __pycache__/
 cookies.txt
 settings.json
 data/
+.DS_Store
