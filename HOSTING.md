@@ -15,7 +15,7 @@ The bot runs on any device that stays on and online. Instagram and YouTube work 
 TELEGRAM_BOT_TOKEN=123456:ABC...        # required
 ALLOWED_CHATS=-1001234567890            # only this group can use the bot
 ALLOWED_USERS=123456789                 # optional: also allow these people in private chat (get your ID with /id)
-COOKIES_FILE=/full/path/to/cookies.txt  # optional: Instagram login cookies (see README)
+COOKIES_FILE=/full/path/to/cookies.txt  # optional: Instagram login cookies (see INSTALL.md)
 ```
 
 Pick your device:

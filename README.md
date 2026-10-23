@@ -17,7 +17,7 @@ python bot.py
 ## Notes
 
 - Telegram bots can upload at most 50 MB; larger files are skipped. Videos are capped at 720p to stay under it. Run a [local Bot API server](https://github.com/tdlib/telegram-bot-api) and set `TELEGRAM_API_BASE` for up to 2 GB.
-- Instagram usually needs login cookies: export `cookies.txt` from a logged-in browser and set `COOKIES_FILE`. Use a throwaway account, as heavy use can get it flagged.
+- Instagram usually needs login cookies: export `cookies.txt` from a logged-in browser and set `COOKIES_FILE` (full steps in [INSTALL.md](INSTALL.md#instagram-login-cookies-optional)). Use a throwaway account, as heavy use can get it flagged.
 - Image posts: Twitter/X photos use the fxtwitter API (no setup). Reddit images and galleries need `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` (free "script" app at reddit.com/prefs/apps); anonymous access is blocked on many networks. Instagram photos and carousels go through yt-dlp and need `COOKIES_FILE`.
 - Keep yt-dlp current (`pip install -U yt-dlp`); these sites change often.
 - Set `ALLOWED_USERS` and/or `ALLOWED_CHATS` (send `/id` in a group to get its ID) to keep the bot private. With only `ALLOWED_CHATS` set, the bot works for everyone in that group and nowhere else.

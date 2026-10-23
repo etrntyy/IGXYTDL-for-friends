@@ -6,6 +6,7 @@ Step-by-step setup for **Windows**, **Linux** and the **Raspberry Pi 4 Model B (
 - [Windows 10 / 11](#windows-10--11)
 - [Linux (Ubuntu, Debian, Mint, Fedora, Arch)](#linux)
 - [Raspberry Pi 4 Model B, 4 GB](#raspberry-pi-4-model-b-4-gb)
+- [Instagram login cookies (optional)](#instagram-login-cookies-optional)
 - [Running on more than one device: who is active?](#running-on-more-than-one-device-who-is-active)
 - [The settings file (.env)](#the-settings-file-env)
 - [Updating, stopping, uninstalling](#updating-stopping-uninstalling)
@@ -24,7 +25,7 @@ You need four things:
 3. **Your group's ID.** Add the bot to your group and send `/id` there. It replies with a negative number such as `-1001234567890`.
 4. **The code.** Either `git clone` the repository, or download the ZIP from the repository page (**Code → Download ZIP**) and unzip it.
 
-Optional: your own Telegram user ID (send `/id` to the bot in a private chat) if you want to use the bot outside the group, and a cookies file if you want Instagram (see the README).
+Optional: your own Telegram user ID (send `/id` to the bot in a private chat) if you want to use the bot outside the group, and a cookies file if you want Instagram (see [Instagram login cookies](#instagram-login-cookies-optional)).
 
 You do **not** need to open any ports or change your router. The bot only makes outgoing connections.
 
@@ -208,6 +209,58 @@ Wait two minutes, then send `/start` to the bot again. If it answers, the Pi is 
 
 ---
 
+## Instagram login cookies (optional)
+
+Instagram blocks almost every download unless the bot is "logged in". The bot cannot log in itself, so you give it a copy of a login session, called **cookies**, exported from your browser. YouTube, X and Reddit work without this.
+
+Use a **throwaway Instagram account**, not your main one. The cookie file is a full login for that account: anyone who has the file can act as that account until you log out of that session or change the password.
+
+**Part 1: export the cookies from Chrome (on any computer)**
+1. In Chrome, log in to instagram.com with the throwaway account. Make sure you can see the feed.
+2. Open the Chrome Web Store and search for **Get cookies.txt LOCALLY**. Click **Add to Chrome**, then **Add extension**.
+3. Click the puzzle-piece icon in Chrome's toolbar and pin the extension, so its icon is visible.
+4. Open an instagram.com tab and click the extension's icon.
+5. Choose the **Netscape** format. This is the format the bot can read.
+6. Click **Export**. Chrome saves a file in your Downloads folder, usually named `www.instagram.com_cookies.txt`.
+
+Do this in the Chrome profile where the throwaway account is logged in, so you don't export your main account by mistake.
+
+**Part 2: put the file where the bot runs**
+
+*Raspberry Pi (from your computer to the Pi; use your own username and hostname):*
+```bash
+scp ~/Downloads/www.instagram.com_cookies.txt YOURUSER@igxytdl-pi.local:~/igxytdl/cookies.txt
+```
+Then, on the Pi, lock the file down so only your user can read it:
+```bash
+chmod 600 ~/igxytdl/cookies.txt
+```
+
+*Linux (same computer):*
+```bash
+mv ~/Downloads/www.instagram.com_cookies.txt ~/igxytdl/cookies.txt && chmod 600 ~/igxytdl/cookies.txt
+```
+
+*Windows:* move `www.instagram.com_cookies.txt` from Downloads into the bot's folder (for example `C:\IGXYTDL`) and rename it `cookies.txt`.
+
+Then delete the original from your Downloads folder, so only one copy exists.
+
+**Part 3: point the bot at it**
+
+Open `.env` and set the full path:
+```
+COOKIES_FILE=/home/YOURUSER/igxytdl/cookies.txt        # Raspberry Pi / Linux
+COOKIES_FILE=C:\IGXYTDL\cookies.txt                     # Windows
+```
+Restart the bot: `sudo systemctl restart igxytdl` on Linux and the Pi, or close and reopen `run.bat` on Windows.
+
+**Part 4: keep it working**
+- Cookies expire after a while. If Instagram links start failing with "empty media response", export fresh cookies (Part 1) and repeat Parts 2 and 3.
+- Never send the file in a chat, never put it in a repository or a cloud folder. If it leaks, change that account's password, which logs out every session using it.
+- Each device that runs the bot needs its **own** cookies from its own throwaway account. Do not copy one person's file to another device.
+
+---
+
 ## Running on more than one device: who is active?
 
 You can run the bot on several devices with the same token (set `SHARED_HOSTING=1` and a different `HOST_NAME` on each; see [HOSTING.md](HOSTING.md), section F). Only one of them answers at a time. Here is how they take turns:
@@ -263,6 +316,6 @@ Notes:
 | Bot does not react to links in the group | Group Privacy is still on, the bot was not re-added after turning it off, or `ALLOWED_CHATS` has the wrong ID (send `/id` in the group). |
 | `Conflict: terminated by other getUpdates request` | Another copy is running with the same token. Stop it, or set `SHARED_HOSTING=1` on all copies. |
 | YouTube: "Sign in to confirm you're not a bot" | Update yt-dlp, try again later, or use a YouTube `cookies.txt`. |
-| Instagram: "empty media response" | Cookies are missing or expired. Export fresh ones (see the README). |
+| Instagram: "empty media response" | Cookies are missing or expired. Export fresh ones ([Instagram login cookies](#instagram-login-cookies-optional)). |
 | Videos over 50 MB are skipped | Telegram's limit for bots. The bot picks a lower quality automatically; very long videos may only fit at 360p or less. |
 | Service will not start (Linux/Pi) | Run `journalctl -u igxytdl -n 50` and read the last lines. A missing or wrong token in `.env` is the usual cause. |

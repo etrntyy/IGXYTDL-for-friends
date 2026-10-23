@@ -82,19 +82,23 @@ In the group, send `/host`. The bot answers **Running on: …** with the name of
 
 Use a **throwaway Instagram account**, not your main one. The cookie file is a full login for that account: anyone who has the file can act as that account until you log out of it or change its password.
 
-1. On your computer, log in to instagram.com in Chrome with the throwaway account.
-2. Install the **Get cookies.txt LOCALLY** extension, open an instagram.com tab, click it, choose **Netscape** and export. You get a file like `www.instagram.com_cookies.txt`.
-3. Copy it to the Pi (use your own names), then delete it from your Downloads folder:
+1. In Chrome, log in to instagram.com with the throwaway account. Make sure you can see the feed.
+2. Open the Chrome Web Store and search for **Get cookies.txt LOCALLY**. Click **Add to Chrome**, then **Add extension**.
+3. Click the puzzle-piece icon in Chrome's toolbar and pin the extension, so its icon is visible.
+4. Open an instagram.com tab and click the extension's icon.
+5. Choose the **Netscape** format. This is the format the bot can read.
+6. Click **Export**. Chrome saves a file in your Downloads folder, usually named `www.instagram.com_cookies.txt`.
+7. Copy it to the Pi (use your own names), then delete it from your Downloads folder:
    ```bash
    scp ~/Downloads/www.instagram.com_cookies.txt YOURUSER@igxytdl-pi.local:~/igxytdl/cookies.txt
    ```
-4. On the Pi, lock the file down and point the bot at it:
+8. On the Pi, lock the file down and point the bot at it:
    ```bash
    chmod 600 ~/igxytdl/cookies.txt
    nano ~/igxytdl/.env
    ```
    Set `COOKIES_FILE=/home/YOURUSER/igxytdl/cookies.txt` (your real username), save, then `sudo systemctl restart igxytdl`.
-5. Cookies expire after a while. If Instagram links start failing with "empty media response", export fresh ones and repeat.
+9. Cookies expire after a while. If Instagram links start failing with "empty media response", export fresh ones and repeat.
 
 Keep the file private: never send it in a chat, never put it in a repo or cloud folder. If it leaks, change that account's password, which logs out every session using it.
 
