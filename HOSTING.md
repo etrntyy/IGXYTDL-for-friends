@@ -167,7 +167,7 @@ Idea: a few group members each run the bot on their own device. Whoever is onlin
 - **The token is full control of the bot.** Anyone who has it can read what the bot receives and act as the bot. Share it only with people you trust, and not in the group chat. If someone leaves the group, revoke the token in @BotFather (`/mybots` → API Token → Revoke) and send the new one to the remaining hosts.
 - **Failover is not instant.** If the active device crashes, links sent during the gap (up to about 90 seconds) wait and are handled when the next device takes over. If it shuts down normally, the handover takes under half a minute.
 - **Each device has its own settings.** `/autodownload` choices and Instagram cookies are stored on the device, so after a handover the bot may behave per that device's settings. Agree on the same choices, and give every host the same `.env`.
-- **Instagram cookies:** every host who wants Instagram needs their own `cookies.txt` from their own browser.
+- **Instagram cookies:** every host who wants Instagram needs their own `cookies.txt` from their own browser. Never share the file, use a throwaway account with 2FA turned on, and see the security recommendations in [INSTALL.md](INSTALL.md#instagram-login-cookies-optional) for what to do if it leaks.
 - **Downloads in progress** are lost if the device handling them goes offline; resend the link.
 - If Telegram refuses the marker the bot uses (the log says "lease unavailable"), it continues as a normal single bot without failover.
 

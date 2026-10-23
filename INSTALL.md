@@ -256,8 +256,19 @@ Restart the bot: `sudo systemctl restart igxytdl` on Linux and the Pi, or close 
 
 **Part 4: keep it working**
 - Cookies expire after a while. If Instagram links start failing with "empty media response", export fresh cookies (Part 1) and repeat Parts 2 and 3.
-- Never send the file in a chat, never put it in a repository or a cloud folder. If it leaks, change that account's password, which logs out every session using it.
-- Each device that runs the bot needs its **own** cookies from its own throwaway account. Do not copy one person's file to another device.
+
+**Security recommendations (please read)**
+- **Use a throwaway account, never your main one.** If it gets flagged, banned or leaked, you lose nothing that matters. Instagram can ban accounts used by bots.
+- **Never share your `cookies.txt`.** It is a full login. Anyone who has it can view the account, read its messages and post as it, without a password or 2FA code, until that session is logged out. Never send it in a chat or email, and never put it in a repository, a zip, or a cloud folder (Drive, Dropbox, iCloud).
+- **Each host uses their own account and their own cookies.** Do not copy one person's file to another device or ask anyone for theirs. A device without cookies still serves YouTube, X and Reddit.
+- **Turn on two-factor authentication (2FA)** on the throwaway account. 2FA does not stop a stolen cookie file from working, but it stops anyone from logging in with the password or changing the account's password and email, so you can still recover the account.
+- **Lock the file down** so only your user can read it (`chmod 600` on Linux and the Pi), and keep the device itself private: anyone with access to the Pi or computer can read the file.
+- **Delete the original download** from your Downloads folder after you copy it.
+- **If it leaks or you stop using it:** change that account's password, then in Instagram open **Settings → Accounts Center → Password and security → Where you're logged in** and log out every session. That makes the exported cookies useless immediately. Then delete `cookies.txt` from the device.
+- **Remember what the bot does with the account:** every Instagram link sent in the group is fetched *as that account*. Posts from private accounts that the throwaway account follows can be downloaded by anyone in the group, and Instagram sees the activity from the host's internet connection. Follow nobody private with it.
+- **Protect the bot token as well.** Anyone with the token controls the bot. Send it only privately, never in the group, and revoke it in @BotFather (`/mybots` → your bot → API Token → Revoke) if a host leaves.
+- **Only run code you trust.** A modified copy of the bot could send your cookies elsewhere. Get the code only from the repository or from the person who runs the group.
+- **Keep it limited:** set `ALLOWED_CHATS` so only your group can use the bot, and keep `cookies.txt`, `.env` and `settings.json` out of any repository (they are already in `.gitignore`).
 
 ---
 
