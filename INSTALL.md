@@ -120,11 +120,11 @@ After the first boot:
    ```bash
    pacman-key --init && pacman-key --populate archlinuxarm && pacman -Syu
    ```
-3. Install what the bot needs. Arch doesn't ship `sudo`, so add it and let the `wheel` group use it (`visudo`, then remove the `#` in front of the `%wheel` line):
+3. Arch doesn't ship `sudo`. Install it and let the `wheel` group use it by running `visudo` and removing the `#` in front of the `%wheel` line:
    ```bash
-   pacman -S --needed sudo git python python-pip ffmpeg
+   pacman -S --needed sudo
    ```
-4. Log out of root and carry on as `alarm`. Get the code as described earlier, then follow the Arch and Manjaro steps under [Linux](#linux): create the environment, fill in `.env`, and install the systemd service so the bot starts at boot.
+4. Log out of root and carry on as `alarm`. From here it's the Arch and Manjaro route under [Linux](#linux): run its `pacman` line for git, Python and ffmpeg (with `sudo`), get the code as described earlier, create the environment, fill in `.env`, and install the systemd service so the bot starts at boot.
 5. Check that the clock is right with `timedatectl`. A Pi has no clock battery, and a wrong date makes the secure connections to Telegram fail.
 
 ## Android (Termux)
