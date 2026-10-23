@@ -1,4 +1,4 @@
-"""Telegram bot that downloads Instagram, YouTube and Twitter/X media via yt-dlp."""
+"""Telegram bot that downloads Instagram, YouTube, TikTok, Twitter/X and Reddit media via yt-dlp."""
 import asyncio
 import json
 import logging
@@ -77,7 +77,7 @@ SETTINGS_FILE = Path(os.getenv("SETTINGS_FILE", Path(__file__).with_name("settin
 
 URL_RE = re.compile(r"https?://[^\s]+")
 SITE_RE = re.compile(
-    r"^https?://([\w-]+\.)*(instagram\.com|youtube\.com|youtu\.be|twitter\.com|x\.com|t\.co|fxtwitter\.com|vxtwitter\.com|reddit\.com|redd\.it)/",
+    r"^https?://([\w-]+\.)*(instagram\.com|youtube\.com|youtu\.be|twitter\.com|x\.com|t\.co|fxtwitter\.com|vxtwitter\.com|reddit\.com|redd\.it|tiktok\.com)/",
     re.I,
 )
 SITES = {  # name -> (domains, auto-download default)
@@ -85,8 +85,9 @@ SITES = {  # name -> (domains, auto-download default)
     "x": (("twitter.com", "x.com", "t.co", "fxtwitter.com", "vxtwitter.com"), True),
     "reddit": (("reddit.com", "redd.it"), True),
     "youtube": (("youtube.com", "youtu.be"), True),
+    "tiktok": (("tiktok.com",), True),
 }
-SITE_ALIASES = {"twitter": "x", "yt": "youtube", "ig": "instagram", "insta": "instagram"}
+SITE_ALIASES = {"twitter": "x", "yt": "youtube", "ig": "instagram", "insta": "instagram", "tt": "tiktok"}
 YOUTUBE_RE = re.compile(r"(youtube\.com|youtu\.be)", re.I)
 
 VIDEO_EXT = {".mp4", ".mov", ".webm", ".mkv"}
@@ -289,7 +290,7 @@ def _ytdlp(url: str, outdir: Path, kind: str, opt) -> list[Path]:
     opts = {
         "outtmpl": str(outdir / "%(autonumber)02d_%(id)s.%(ext)s"),
         "noplaylist": bool(YOUTUBE_RE.search(url)),  # single video from watch?v=..&list=..
-        "playlistend": 10,  # Instagram carousels / Twitter multi-video
+        "playlistend": 1 if site_of(url) == "tiktok" else 10,  # Instagram carousels / Twitter multi-video; a TikTok profile link gives one video, not ten
         "max_filesize": MAX_BYTES,
         "logger": lg,
         "ignoreerrors": "only_download",  # one bad carousel item shouldn't drop the rest
@@ -318,14 +319,45 @@ def _ytdlp(url: str, outdir: Path, kind: str, opt) -> list[Path]:
     return files
 
 
+def video_shape(path: Path) -> dict:
+    """Width, height and length as a viewer should see them, so Telegram never stretches or squashes a video.
+
+    Uses ffprobe to read the stored size, the pixel shape (SAR) and any rotation flag. Returns {} if that fails,
+    and Telegram then reads the file itself, as before."""
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+             "stream=width,height,sample_aspect_ratio,duration:stream_tags=rotate:stream_side_data=rotation:format=duration",
+             "-of", "json", str(path)],
+            capture_output=True, text=True, timeout=30, check=True,
+        ).stdout
+        data = json.loads(out)
+        st = data["streams"][0]
+        w, h = int(st["width"]), int(st["height"])
+        sar = st.get("sample_aspect_ratio") or "1:1"
+        num, _, den = sar.partition(":")
+        ratio = float(num) / float(den) if den and float(den) and float(num) else 1.0
+        w = round(w * ratio)  # non-square pixels: widen to the shape the video is meant to have
+        rot = st.get("tags", {}).get("rotate") or next((d["rotation"] for d in st.get("side_data_list", []) if "rotation" in d), 0)
+        if int(float(rot)) % 180 == 90:  # phone video stored sideways with a turn flag
+            w, h = h, w
+        length = float(st.get("duration") or data.get("format", {}).get("duration") or 0)
+        return {"width": w, "height": h, "duration": int(length)}
+    except Exception as e:
+        log.info("couldn't read video shape of %s: %s", path.name, e)
+        return {}
+
+
 async def send_group(msg, files: list[Path]) -> None:
     """Send photos/videos together as one Telegram album (2-10 items)."""
     handles = [f.open("rb") for f in files]
     try:
-        media = [
-            InputMediaVideo(h, supports_streaming=True) if f.suffix.lower() in VIDEO_EXT else InputMediaPhoto(h)
-            for f, h in zip(files, handles)
-        ]
+        media = []
+        for f, h in zip(files, handles):
+            if f.suffix.lower() in VIDEO_EXT:
+                media.append(InputMediaVideo(h, supports_streaming=True, **await asyncio.to_thread(video_shape, f)))
+            else:
+                media.append(InputMediaPhoto(h))
         await msg.reply_media_group(media, read_timeout=600, write_timeout=600)
     finally:
         for h in handles:
@@ -341,7 +373,8 @@ async def send_file(msg, path: Path, as_document: bool = False, markup=None, cap
         if as_document:
             return await msg.reply_document(f, read_timeout=300, write_timeout=300)
         elif ext in VIDEO_EXT:
-            return await msg.reply_video(f, supports_streaming=True, reply_markup=markup, caption=caption, read_timeout=300, write_timeout=300)
+            shape = await asyncio.to_thread(video_shape, path)
+            return await msg.reply_video(f, supports_streaming=True, reply_markup=markup, caption=caption, read_timeout=300, write_timeout=300, **shape)
         elif ext in ANIM_EXT:
             return await msg.reply_animation(f, read_timeout=300, write_timeout=300)
         elif ext in PHOTO_EXT:
@@ -384,12 +417,12 @@ def auto_status(chat_id: int) -> str:
 
 
 async def autodownload_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    """/autodownload [instagram|x|reddit|youtube|all] [on|off] — site alone toggles, nothing shows status."""
+    """/autodownload [instagram|x|reddit|youtube|tiktok|all] [on|off] — site alone toggles, nothing shows status."""
     if not allowed(update):
         return
     chat_id = update.effective_chat.id
     args = [a.lower() for a in ctx.args or []]
-    usage = "Usage: /autodownload <instagram|x|reddit|youtube|all> [on|off]"
+    usage = "Usage: /autodownload <instagram|x|reddit|youtube|tiktok|all> [on|off]"
     if not args:
         await update.message.reply_text(f"Auto download (✅ on, ⛔ off):\n{auto_status(chat_id)}\n\n{usage}")
         return
@@ -405,7 +438,7 @@ async def autodownload_cmd(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> No
 
 async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
-        "Send me an Instagram, YouTube, Twitter/X or Reddit link and I'll download it in the best quality that fits Telegram.\n"
+        "Send me an Instagram, YouTube, TikTok, Twitter/X or Reddit link and I'll download it in the best quality that fits Telegram.\n"
         "Photo posts come as JPG.\n"
         "/audio <link> gets just the MP3.\n"
         "/autodownload turns instant downloads on or off per site; when off, you pick 1080p/720p/480p/360p or MP3 with buttons.\n"
@@ -492,7 +525,7 @@ async def handle(update: Update, ctx: ContextTypes.DEFAULT_TYPE, fmt: str | None
     urls = [u for u in URL_RE.findall(msg.text or "") if SITE_RE.match(u)]
     if not urls:
         if fmt:  # /audio without a usable link; ordinary chatter gets no reply
-            await msg.reply_text("Send a valid Instagram, YouTube, Twitter/X or Reddit link.")
+            await msg.reply_text("Send a valid Instagram, YouTube, TikTok, Twitter/X or Reddit link.")
         return
     for url in urls[:3]:
         if fmt or auto_enabled(update.effective_chat.id, site_of(url)):

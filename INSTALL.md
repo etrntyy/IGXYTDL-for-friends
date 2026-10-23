@@ -279,5 +279,6 @@ When a link can't be downloaded the bot says nothing in the chat, it just remove
 | The log shows "Sign in to confirm you're not a bot" for YouTube | Force a yt-dlp update, wait a while, or add cookies from a YouTube login |
 | The log shows "empty media response" for Instagram | The cookies are missing, expired or from a logged-out session. Export new ones |
 | The log shows "Account authentication is required" or "needs a login" for Reddit | Add Reddit API keys or cookies, see [Reddit access](#reddit-access). Cookies expire, so export fresh ones if it worked before |
+| TikTok links do nothing and the log shows a timeout for tiktok.com | That connection can't reach TikTok (some countries and providers block it). A host on another connection may work |
 | A video is missing or low quality | Telegram limits bots to 50 MB, so very long videos only fit at 360p or lower. [Files over 50 MB](#files-over-50-mb) explains how to raise it |
 | The service won't start on Linux or Pi | `journalctl -u igxytdl -n 50` shows why. A wrong or empty token in `.env` is the usual cause |
