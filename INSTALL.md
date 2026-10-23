@@ -1,14 +1,8 @@
 # Installing the bot
 
-Read the first three sections, then jump to your system: [Windows](#windows), [Mac](#mac), [Linux](#linux), [Raspberry Pi 4](#raspberry-pi-4), [Android](#android-termux) or [Docker](#docker). Instagram cookies, Reddit access, updating and troubleshooting come after.
+Get the code and fill in the settings file first, then jump to your system: [Windows](#windows), [Mac](#mac), [Linux](#linux), [Raspberry Pi 4](#raspberry-pi-4), [Android](#android-termux) or [Docker](#docker). Instagram cookies, Reddit access, updating and troubleshooting come after.
 
 Nothing here needs open ports or router changes. The bot only connects outward.
-
-## Before you start
-
-1. In Telegram, message @BotFather and send `/newbot`. Answer its questions and it gives you a token that looks like `123456:ABC-DEF...`. Whoever has the token controls the bot, so keep it out of chats and screenshots.
-2. Still in @BotFather, send `/mybots`, pick your bot, then Bot Settings, Group Privacy, Turn off. If you skip this the bot can't see links in a group.
-3. Add the bot to your group and send `/id` there. It answers with the group's ID, a negative number like `-1001234567890`.
 
 ## Get the code
 
@@ -24,7 +18,7 @@ cd igxytdl
 The bot reads its settings from a file called `.env` inside that folder. The installers create it for you from `.env.example`, and you open it in any text editor (`nano .env` on Mac, Linux and Pi, Notepad on Windows). A working one looks like this, without the explanations after the `#`:
 
 ```
-TELEGRAM_BOT_TOKEN=123456:ABC-DEF...     # from @BotFather
+TELEGRAM_BOT_TOKEN=123456:ABC-DEF...     # the bot's token; keep it out of chats and screenshots
 ALLOWED_CHATS=-1001234567890             # the group ID from /id; only this group can use the bot
 ALLOWED_USERS=                           # your own user ID (send /id to the bot privately) if you want private chat too
 COOKIES_FILE=                            # path to your Instagram cookies.txt, see below
@@ -243,7 +237,7 @@ When a link can't be downloaded the bot says nothing in the chat, it just remove
 |---|---|
 | `python` isn't recognised on Windows | Reinstall Python with "Add python.exe to PATH" ticked |
 | `Could not resolve hostname igxytdl-pi.local` | Give the Pi another minute to boot, or connect by IP address as described in the Pi section |
-| The bot ignores links in the group | Group Privacy is still on (turn it off, then remove and re-add the bot), or `ALLOWED_CHATS` holds the wrong ID. Send `/id` in the group to check |
+| The bot ignores links in the group | `ALLOWED_CHATS` probably holds the wrong ID. Send `/id` in the group to see the right one. If that matches, ask whoever runs the bot to check its group settings |
 | `Conflict: terminated by other getUpdates request` | Another copy is running with the same token. Stop it, or set `SHARED_HOSTING=1` on all of them |
 | The log shows "Sign in to confirm you're not a bot" for YouTube | Force a yt-dlp update, wait a while, or add cookies from a YouTube login |
 | The log shows "empty media response" for Instagram | The cookies are missing, expired or from a logged-out session. Export new ones |

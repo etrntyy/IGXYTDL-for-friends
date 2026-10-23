@@ -45,6 +45,6 @@ Never run a copy without `SHARED_HOSTING=1` next to the others. Two plain copies
 
 Things to agree on first:
 
-- The token gives full control of the bot, so only share it with people you trust, and not in the group chat. If someone leaves, revoke the token in @BotFather (`/mybots`, your bot, API Token, Revoke) and send the new one to the rest.
+- The token gives full control of the bot, so only share it with people you trust, and not in the group chat. If someone leaves, the owner replaces the token and sends the new one to the remaining hosts.
 - `/autodownload` choices and Instagram cookies live on each device. After a handover the bot uses the new device's settings, so it helps if everyone starts from the same `.env`.
 - Instagram works only while the active device has working cookies of its own. Each host who wants Instagram sets up their own throwaway account, as described in [INSTALL.md](INSTALL.md#instagram-login-cookies).

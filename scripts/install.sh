@@ -19,7 +19,7 @@ command -v ffmpeg >/dev/null 2>&1 || echo "Note: no system ffmpeg found; the bot
 .venv/bin/pip install -q -r requirements.txt
 [ -f .env ] || cp .env.example .env
 
-read -rsp "Telegram bot token from @BotFather (Enter to fill in .env yourself later): " tok; echo
+read -rsp "Telegram bot token (Enter to fill in .env yourself later): " tok; echo
 if [ -n "$tok" ]; then
   TOK="$tok" .venv/bin/python - <<'PY'
 import os, pathlib, re
