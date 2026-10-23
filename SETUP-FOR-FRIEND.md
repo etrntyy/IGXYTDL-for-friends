@@ -39,7 +39,7 @@ cd igxytdl
 **If you were invited to the GitHub repository**, on the Pi:
 ```bash
 sudo apt-get install -y git
-git clone https://github.com/etrntyy/IGXYTDL.git igxytdl
+git clone https://github.com/etrntyy/IGXYTDL-for-friends.git igxytdl
 cd igxytdl
 ```
 (GitHub asks for your username and a personal access token with read access to the repository as the password.)

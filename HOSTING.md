@@ -35,7 +35,7 @@ Several people hosting the same bot: see [F](#f-several-people-hosting-the-same-
 Works on Raspberry Pi OS, Ubuntu, Debian.
 
 ```bash
-git clone https://github.com/etrntyy/IGXYTDL.git igxytdl
+git clone https://github.com/etrntyy/IGXYTDL-for-friends.git igxytdl
 cd igxytdl
 ./scripts/install.sh --service
 ```
@@ -82,7 +82,7 @@ Three or four downloads at once fit comfortably. The real limit is your internet
 2. Open Termux and run:
    ```bash
    pkg install -y git
-   git clone https://github.com/etrntyy/IGXYTDL.git igxytdl
+   git clone https://github.com/etrntyy/IGXYTDL-for-friends.git igxytdl
    cd igxytdl
    ./scripts/termux-setup.sh
    nano .env
@@ -99,7 +99,7 @@ Three or four downloads at once fit comfortably. The real limit is your internet
 ## C. Windows laptop
 
 1. Install **Python 3.10+** from python.org. Tick **Add python.exe to PATH** in the installer.
-2. Download the bot: on github.com/etrntyy/IGXYTDL click **Code → Download ZIP**, then unzip it (or `git clone` if you have git).
+2. Download the bot: on github.com/etrntyy/IGXYTDL-for-friends click **Code → Download ZIP**, then unzip it (or `git clone` if you have git).
 3. Double-click **`run.bat`**. First run sets everything up and opens `.env` in Notepad: paste your token, save, close, press a key.
 4. Leave the window open. It restarts the bot if it crashes.
 5. Start with Windows: press `Win+R`, type `shell:startup`, and put a shortcut to `run.bat` in that folder.
@@ -108,7 +108,7 @@ Three or four downloads at once fit comfortably. The real limit is your internet
 ## D. Mac
 
 ```bash
-git clone https://github.com/etrntyy/IGXYTDL.git igxytdl
+git clone https://github.com/etrntyy/IGXYTDL-for-friends.git igxytdl
 cd igxytdl
 ./scripts/install.sh
 nano .env            # check the settings
@@ -122,7 +122,7 @@ caffeinate -is ./scripts/run-forever.sh
 Needs Docker (Docker Desktop on Windows/Mac, `curl -fsSL https://get.docker.com | sh` on Linux/Pi).
 
 ```bash
-git clone https://github.com/etrntyy/IGXYTDL.git igxytdl
+git clone https://github.com/etrntyy/IGXYTDL-for-friends.git igxytdl
 cd igxytdl
 cp .env.example .env     # then edit .env and add your token
 mkdir -p data            # put cookies.txt in here if you use Instagram cookies
