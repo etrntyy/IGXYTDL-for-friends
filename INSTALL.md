@@ -185,14 +185,40 @@ A few rules for the cookies file:
 
 ## Reddit access
 
-Reddit now wants a login before it shows most posts, so a Reddit link can fail with "Account authentication is required". A free API key lets the bot fetch Reddit videos, images and galleries through Reddit's official API instead.
+Reddit now wants a login before it shows most posts, so a Reddit link can fail with "Account authentication is required". There are two ways to give the bot access. Use whichever works for you, or both.
+
+### Option 1: API keys
+
+A free API key lets the bot fetch Reddit videos, images and galleries through Reddit's official API.
 
 1. Log in to reddit.com, open reddit.com/prefs/apps and click "create another app".
 2. Give it any name, choose "script", and enter `http://localhost:8080` as the redirect URI (it's never used).
 3. Click create. The client ID is the short string under the app's name, and the secret is labelled "secret".
 4. Put them in `.env` as `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET`, then restart the bot.
 
-Reddit has started reviewing new apps, so it may ask for approval or refuse. The other way in is cookies: export reddit.com the same way as Instagram above, then paste the new lines into the same `cookies.txt` underneath the existing ones (leave out the `# Netscape` header line). Use a spare Reddit account for this, and the same rules apply as for Instagram.
+Reddit has started reviewing new apps, so it may ask for approval or refuse. If it does, use option 2.
+
+### Option 2: Reddit cookies
+
+This is the same idea as the Instagram cookies, with a Reddit login. Use a spare Reddit account, not your main one.
+
+1. In Chrome, log in to reddit.com with the spare account.
+2. The extension is the one from the Instagram steps. If it isn't installed yet, do steps 2 and 3 of the [Instagram export](#instagram-login-cookies) first.
+3. Open a reddit.com tab, click the extension's icon, choose Netscape and click Export. Chrome saves `www.reddit.com_cookies.txt` in Downloads.
+4. Add it to the bot's `cookies.txt`. The bot uses one file for every site and picks cookies by address, so Reddit's lines go underneath Instagram's. If you don't use Instagram cookies, the Reddit file is simply your `cookies.txt` and you can follow the table in the Instagram section instead.
+
+   | System | Command |
+   |---|---|
+   | Mac, Linux | `printf '\n' >> ~/igxytdl/cookies.txt && grep -v '^# ' ~/Downloads/www.reddit.com_cookies.txt >> ~/igxytdl/cookies.txt` |
+   | Raspberry Pi | From your computer: `scp ~/Downloads/www.reddit.com_cookies.txt YOURUSER@igxytdl-pi.local:~`, then on the Pi: `printf '\n' >> ~/igxytdl/cookies.txt && grep -v '^# ' ~/www.reddit.com_cookies.txt >> ~/igxytdl/cookies.txt` |
+   | Windows | In Command Prompt: `echo.>> C:\IGXYTDL\cookies.txt` and then `findstr /V /B /C:"# " "%USERPROFILE%\Downloads\www.reddit.com_cookies.txt" >> C:\IGXYTDL\cookies.txt` |
+   | Docker | Same as Mac and Linux, with `data/cookies.txt` in place of `~/igxytdl/cookies.txt` |
+
+   Those commands copy every line except the two header lines that start with `# `, so the file keeps a single header.
+5. Delete the downloaded Reddit file, make sure `COOKIES_FILE` in `.env` points at `cookies.txt`, and restart the bot.
+6. Send the bot a Reddit link to check. If it still says authentication is required, the cookies have expired or were exported while logged out, so export them again and repeat step 4.
+
+The rules for the Instagram cookies file apply here too: keep it private, one account per host, two-factor login on, and change the account's password if the file ever leaks.
 
 ## Starting, stopping and updating
 
@@ -219,6 +245,6 @@ To update yt-dlp right away, run `pip install -U yt-dlp` from inside the folder 
 | `Conflict: terminated by other getUpdates request` | Another copy is running with the same token. Stop it, or set `SHARED_HOSTING=1` on all of them |
 | YouTube says "Sign in to confirm you're not a bot" | Force a yt-dlp update, wait a while, or add cookies from a YouTube login |
 | Instagram says "empty media response" | The cookies are missing, expired or from a logged-out session. Export new ones |
-| Reddit says "Account authentication is required" or "needs a login" | Add Reddit API keys or cookies, see [Reddit access](#reddit-access) |
+| Reddit says "Account authentication is required" or "needs a login" | Add Reddit API keys or cookies, see [Reddit access](#reddit-access). Cookies expire, so export fresh ones if it worked before |
 | A video is missing or low quality | Telegram limits bots to 50 MB, so very long videos only fit at 360p or lower |
 | The service won't start on Linux or Pi | `journalctl -u igxytdl -n 50` shows why. A wrong or empty token in `.env` is the usual cause |
