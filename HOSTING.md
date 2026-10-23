@@ -1,5 +1,7 @@
 # Hosting the bot on your own device
 
+For detailed step-by-step installation on Windows, Linux and a Raspberry Pi 4, see [INSTALL.md](INSTALL.md). This page adds hosting options, hardware needs and shared hosting.
+
 The bot runs on any device that stays on and online. Instagram and YouTube work best from a home internet connection, which is why this guide skips cloud servers.
 
 **You need first**

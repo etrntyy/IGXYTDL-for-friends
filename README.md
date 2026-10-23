@@ -2,7 +2,7 @@
 
 Send a YouTube, Instagram, Twitter/X or Reddit link; the bot replies with the video/photos. `/audio <link>` returns MP3.
 
-**Running it on your own always-on device (Pi, Android phone, laptop, Docker, or shared between several people): see [HOSTING.md](HOSTING.md) (includes hardware needs and Raspberry Pi tips).**
+**Running it on your own always-on device (Pi, Android phone, laptop, Docker, or shared between several people): see [INSTALL.md](INSTALL.md) for step-by-step setup on Windows, Linux and a Raspberry Pi 4, and [HOSTING.md](HOSTING.md) for hardware needs, tips and running on several devices.**
 
 ## Setup
 
