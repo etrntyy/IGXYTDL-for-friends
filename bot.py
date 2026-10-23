@@ -335,7 +335,7 @@ async def send_group(msg, files: list[Path]) -> None:
 async def send_file(msg, path: Path, as_document: bool = False, markup=None, caption=None):
     ext = path.suffix.lower()
     if path.stat().st_size > MAX_BYTES:
-        await msg.reply_text(f"{path.name} is over {MAX_MB} MB, can't send it on Telegram.")
+        log.info("%s is over %s MB, not sent", path.name, MAX_MB)
         return None
     with path.open("rb") as f:
         if as_document:
@@ -441,6 +441,14 @@ async def run_download(ctx: ContextTypes.DEFAULT_TYPE, msg, url: str, fmt: str) 
         RESTART["downloads"] -= 1
 
 
+async def _drop(status) -> None:
+    """Remove the 'Downloading...' note so a failed link leaves no trace in the chat."""
+    try:
+        await status.delete()
+    except Exception:
+        pass
+
+
 async def _run_download(ctx: ContextTypes.DEFAULT_TYPE, msg, url: str, fmt: str) -> None:
     status = await msg.reply_text("Downloading…")
     tmp = Path(tempfile.mkdtemp(prefix="dlbot_"))
@@ -448,7 +456,8 @@ async def _run_download(ctx: ContextTypes.DEFAULT_TYPE, msg, url: str, fmt: str)
         await ctx.bot.send_chat_action(msg.chat_id, ChatAction.UPLOAD_VIDEO)
         files = await asyncio.to_thread(download, url, tmp, fmt)
         if not files:
-            await status.edit_text(f"Nothing downloaded (no matching media, or over {MAX_MB} MB).")
+            log.info("nothing downloaded for %s", url)
+            await _drop(status)
             return
         await status.edit_text("Uploading…")
         mp3_button = InlineKeyboardMarkup([[InlineKeyboardButton("🎵 Get MP3 of this", callback_data="f|mp3")]])
@@ -466,13 +475,12 @@ async def _run_download(ctx: ContextTypes.DEFAULT_TYPE, msg, url: str, fmt: str)
             if sent and f.suffix.lower() in VIDEO_EXT:  # lets the MP3 button on a video find its source link
                 remember(ctx, sent, url)
         await status.delete()
-    except yt_dlp.utils.DownloadError as e:
-        log.warning("download failed: %s", e)
-        reason = re.sub(r"\x1b\[[0-9;]*m", "", str(e)).splitlines()[-1][:300]
-        await status.edit_text(f"Couldn't download: {reason}")
+    except yt_dlp.utils.DownloadError as e:  # failures stay silent in the chat; the reason goes to the log
+        log.warning("download failed: %s", re.sub(r"\x1b\[[0-9;]*m", "", str(e)).splitlines()[-1][:300])
+        await _drop(status)
     except Exception:
         log.exception("unexpected error")
-        await status.edit_text("Something went wrong.")
+        await _drop(status)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -483,7 +491,7 @@ async def handle(update: Update, ctx: ContextTypes.DEFAULT_TYPE, fmt: str | None
     msg = update.effective_message
     urls = [u for u in URL_RE.findall(msg.text or "") if SITE_RE.match(u)]
     if not urls:
-        if fmt or update.effective_chat.type == "private":
+        if fmt:  # /audio without a usable link; ordinary chatter gets no reply
             await msg.reply_text("Send a valid Instagram, YouTube, Twitter/X or Reddit link.")
         return
     for url in urls[:3]:

@@ -237,14 +237,16 @@ To update yt-dlp right away, run `pip install -U yt-dlp` from inside the folder 
 
 ## Troubleshooting
 
+When a link can't be downloaded the bot says nothing in the chat, it just removes its "Downloading" note. The reason is in the log (see the table above for how to open it), so look there first.
+
 | What you see | What to do |
 |---|---|
 | `python` isn't recognised on Windows | Reinstall Python with "Add python.exe to PATH" ticked |
 | `Could not resolve hostname igxytdl-pi.local` | Give the Pi another minute to boot, or connect by IP address as described in the Pi section |
 | The bot ignores links in the group | Group Privacy is still on (turn it off, then remove and re-add the bot), or `ALLOWED_CHATS` holds the wrong ID. Send `/id` in the group to check |
 | `Conflict: terminated by other getUpdates request` | Another copy is running with the same token. Stop it, or set `SHARED_HOSTING=1` on all of them |
-| YouTube says "Sign in to confirm you're not a bot" | Force a yt-dlp update, wait a while, or add cookies from a YouTube login |
-| Instagram says "empty media response" | The cookies are missing, expired or from a logged-out session. Export new ones |
-| Reddit says "Account authentication is required" or "needs a login" | Add Reddit API keys or cookies, see [Reddit access](#reddit-access). Cookies expire, so export fresh ones if it worked before |
+| The log shows "Sign in to confirm you're not a bot" for YouTube | Force a yt-dlp update, wait a while, or add cookies from a YouTube login |
+| The log shows "empty media response" for Instagram | The cookies are missing, expired or from a logged-out session. Export new ones |
+| The log shows "Account authentication is required" or "needs a login" for Reddit | Add Reddit API keys or cookies, see [Reddit access](#reddit-access). Cookies expire, so export fresh ones if it worked before |
 | A video is missing or low quality | Telegram limits bots to 50 MB, so very long videos only fit at 360p or lower |
 | The service won't start on Linux or Pi | `journalctl -u igxytdl -n 50` shows why. A wrong or empty token in `.env` is the usual cause |
