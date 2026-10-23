@@ -35,4 +35,3 @@ If a few friends will host the same bot so it stays up when one device is off, r
 - X photo tweets work with no setup. Instagram needs login cookies, covered in [INSTALL.md](INSTALL.md#instagram-login-cookies).
 - To lift the 50 MB limit to 2 GB, run Telegram's own [Bot API server](https://github.com/tdlib/telegram-bot-api) and set `TELEGRAM_API_BASE` to its address.
 - Set `ALLOWED_CHATS` so only your group can use the bot. The settings are explained in [INSTALL.md](INSTALL.md#the-settings-file).
-- Only download things you have the right to, and follow each site's terms.
