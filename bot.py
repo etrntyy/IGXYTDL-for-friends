@@ -236,6 +236,14 @@ def _video(url: str, outdir: Path, height: int | None) -> list[Path]:
     return []
 
 
+def cookies_cover(domain: str) -> bool:
+    """True if the cookies file has a login for this site (a file with only Instagram cookies doesn't help Reddit)."""
+    try:
+        return domain in Path(COOKIES).read_text() if COOKIES else False
+    except OSError:
+        return False
+
+
 def download(url: str, outdir: Path, fmt: str) -> list[Path]:
     """Video/audio via yt-dlp; if that finds nothing (image posts), extract the post's images as JPG."""
     _, kind, opt = FORMATS[fmt]
@@ -258,7 +266,7 @@ def download(url: str, outdir: Path, fmt: str) -> list[Path]:
         except Exception as e:  # best-effort; report the yt-dlp error instead
             log.info("image fallback failed: %s", e)
     if not files and err:
-        if site_of(url) == "reddit" and not (REDDIT_ID and REDDIT_SECRET) and not COOKIES:
+        if site_of(url) == "reddit" and not (REDDIT_ID and REDDIT_SECRET) and not cookies_cover("reddit.com"):
             raise yt_dlp.utils.DownloadError("Reddit needs a login now. The bot owner has to add Reddit API keys or cookies (see INSTALL.md).")
         raise err
     return [to_jpg(f) if f.suffix.lower() in PHOTO_EXT else f for f in files]
