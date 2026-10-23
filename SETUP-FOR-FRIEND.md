@@ -21,6 +21,6 @@ Then:
 
 How the devices take turns is explained in [HOSTING.md](HOSTING.md#several-devices-one-bot). The short version: only one answers at a time, whoever claimed the bot first keeps it until it goes offline, and nothing is shared between them.
 
-Instagram is optional on your side. Without cookies your Pi still handles YouTube, X and Reddit, and Instagram links just fail while your Pi is the one answering. If you want Instagram too, set up your own throwaway account following [Instagram login cookies](INSTALL.md#instagram-login-cookies). Don't ask anyone for their cookies and don't share yours.
+Instagram and Reddit links need a login on your Pi too. Set both up with your own spare accounts: [Instagram login cookies](INSTALL.md#instagram-login-cookies) and [Reddit access](INSTALL.md#reddit-access). Don't ask anyone for their cookies and don't share yours.
 
 Keep the token to yourself, and if you stop hosting, tell the group owner so they can replace it.
