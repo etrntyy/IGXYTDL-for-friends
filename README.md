@@ -1,30 +1,37 @@
-# Telegram Downloader Bot
+# IGXYTDL
 
-Send a YouTube, Instagram, Twitter/X or Reddit link; the bot replies with the video/photos. `/audio <link>` returns MP3.
+A Telegram bot for a group chat. Drop an Instagram, YouTube, X (Twitter) or Reddit link and it sends the video or photos back. It runs on a computer, Raspberry Pi or phone that you keep on, since YouTube and Instagram are far less likely to block a home connection than a cloud server.
 
-**Running it on your own always-on device (Pi, Android phone, laptop, Docker, or shared between several people): see [INSTALL.md](INSTALL.md) for step-by-step setup on Windows, Linux and a Raspberry Pi 4, and [HOSTING.md](HOSTING.md) for hardware needs, tips and running on several devices.**
+![logo](assets/logo-512.png)
 
-## Setup
+## What it does
 
-```bash
-brew install ffmpeg            # needed for merging video+audio and for /audio
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env           # then put your @BotFather token in it
-python bot.py
-```
-
-## Notes
-
-- Telegram bots can upload at most 50 MB; larger files are skipped. Videos are capped at 720p to stay under it. Run a [local Bot API server](https://github.com/tdlib/telegram-bot-api) and set `TELEGRAM_API_BASE` for up to 2 GB.
-- For Instagram downloads, you need login cookies: export `cookies.txt` from a logged-in browser and set `COOKIES_FILE` (full steps in [INSTALL.md](INSTALL.md#instagram-login-cookies)). Use a throwaway account, as heavy use can get it flagged.
-- Image posts: Twitter/X photos use the fxtwitter API (no setup). Reddit images and galleries need `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` (free "script" app at reddit.com/prefs/apps); anonymous access is blocked on many networks. Instagram photos and carousels go through yt-dlp and need `COOKIES_FILE`.
-- yt-dlp updates itself at every start and once a day, then the bot restarts itself when no download is running, so new YouTube/Instagram fixes arrive automatically. To force an update right now, see "Updating" in [INSTALL.md](INSTALL.md#updating-stopping-uninstalling). Turn automatic updates off with `AUTO_UPDATE_YTDLP=0` in `.env`.
-- Set `ALLOWED_USERS` and/or `ALLOWED_CHATS` (send `/id` in a group to get its ID) to keep the bot private. With only `ALLOWED_CHATS` set, the bot works for everyone in that group and nowhere else.
-- Only download content you have the right to; respect each platform's terms.
+- Videos come back in the best quality that fits under Telegram's 50 MB limit for bots. If the best version is too big, it tries the next one down, so a long video may end up at 360p.
+- Photo posts and carousels come back as JPG, with a mix of photos and videos sent together as an album.
+- All four sites download as soon as someone posts a link. `/autodownload` turns that off per site, and then the link gets a small menu (best, 1080p, 720p, 480p, 360p, MP3) and nothing happens until someone taps.
+- Every video has a button to get its audio as an MP3.
+- yt-dlp updates itself every day, so YouTube and Instagram changes get picked up without you doing anything.
 
 ## Commands
 
-- `/autodownload`: shows which sites download instantly in this chat.
-- `/autodownload <instagram|x|reddit|youtube|all> [on|off]`: change one site (no on/off toggles it). Defaults: all four sites on. When a site is off, its links only get format buttons and nothing downloads until someone presses one. Saved per chat in `settings.json`.
-- `/audio <link>`: MP3 straight away.
+| Command | What it does |
+|---|---|
+| `/audio <link>` | MP3 straight away |
+| `/autodownload` | Shows which sites download instantly in this chat |
+| `/autodownload <site> on` or `off` | Changes one site (`instagram`, `x`, `reddit`, `youtube`, or `all`). Without on/off it flips the current setting |
+| `/host` | Says which device is running the bot right now |
+| `/id` | Shows the chat ID and your user ID, which you need for the settings file |
+
+## Getting started
+
+[INSTALL.md](INSTALL.md) has step-by-step setup for Windows, Mac, Linux, a Raspberry Pi 4, an Android phone and Docker, plus the settings file, Instagram cookies, updating and troubleshooting.
+
+If a few friends will host the same bot so it stays up when one device is off, read [HOSTING.md](HOSTING.md).
+
+## Good to know
+
+- Reddit images and galleries need free API keys (a "script" app at reddit.com/prefs/apps) in `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET`. Without them Reddit usually blocks the request. Reddit videos work either way.
+- X photo tweets work with no setup. Instagram needs login cookies, covered in [INSTALL.md](INSTALL.md#instagram-login-cookies).
+- To lift the 50 MB limit to 2 GB, run Telegram's own [Bot API server](https://github.com/tdlib/telegram-bot-api) and set `TELEGRAM_API_BASE` to its address.
+- Set `ALLOWED_CHATS` so only your group can use the bot. The settings are explained in [INSTALL.md](INSTALL.md#the-settings-file).
+- Only download things you have the right to, and follow each site's terms.

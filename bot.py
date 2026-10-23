@@ -62,6 +62,7 @@ COOKIES = None
 if _cookies_src and Path(_cookies_src).is_file():  # yt-dlp rewrites its cookie file; work on a copy so read-only secrets and the original stay intact
     COOKIES = str(Path(tempfile.gettempdir()) / "dlbot_cookies.txt")
     shutil.copyfile(_cookies_src, COOKIES)
+    os.chmod(COOKIES, 0o600)  # the copy holds a login session; keep it readable by this user only
 ALLOWED = {int(x) for x in os.getenv("ALLOWED_USERS", "").split(",") if x.strip()}
 ALLOWED_CHATS = {int(x) for x in os.getenv("ALLOWED_CHATS", "").split(",") if x.strip()}  # group/chat IDs (groups are negative)
 UPDATE_HOURS = float(os.getenv("YTDLP_UPDATE_HOURS", "24"))  # 0 = only update at start

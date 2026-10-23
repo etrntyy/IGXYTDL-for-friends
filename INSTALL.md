@@ -1,343 +1,210 @@
-# Installation guide
+# Installing the bot
 
-Step-by-step setup for **Windows**, **Linux** and the **Raspberry Pi 4 Model B (4 GB)**. Pick your system:
+Read the first three sections, then jump to your system: [Windows](#windows), [Mac](#mac), [Linux](#linux), [Raspberry Pi 4](#raspberry-pi-4), [Android](#android-termux) or [Docker](#docker). Instagram cookies, updating and troubleshooting come after.
 
-- [Before you start (all systems)](#before-you-start-all-systems)
-- [Windows 10 / 11](#windows-10--11)
-- [Linux (Ubuntu, Debian, Mint, Fedora, Arch)](#linux)
-- [Raspberry Pi 4 Model B, 4 GB](#raspberry-pi-4-model-b-4-gb)
-- [Instagram login cookies](#instagram-login-cookies)
-- [Running on more than one device: who is active?](#running-on-more-than-one-device-who-is-active)
-- [The settings file (.env)](#the-settings-file-env)
-- [Updating, stopping, uninstalling](#updating-stopping-uninstalling)
-- [Troubleshooting](#troubleshooting)
+Nothing here needs open ports or router changes. The bot only connects outward.
 
-For running the bot on several devices at once, see [HOSTING.md](HOSTING.md).
+## Before you start
 
----
+1. In Telegram, message @BotFather and send `/newbot`. Answer its questions and it gives you a token that looks like `123456:ABC-DEF...`. Whoever has the token controls the bot, so keep it out of chats and screenshots.
+2. Still in @BotFather, send `/mybots`, pick your bot, then Bot Settings, Group Privacy, Turn off. If you skip this the bot can't see links in a group.
+3. Add the bot to your group and send `/id` there. It answers with the group's ID, a negative number like `-1001234567890`.
 
-## Before you start (all systems)
+## Get the code
 
-You need four things:
+Clone it, or download the ZIP from the repository page (Code, then Download ZIP) and unzip it. The rest of this guide calls the folder `igxytdl`.
 
-1. **A bot token.** In Telegram, message **@BotFather**, send `/newbot` and follow the questions. It replies with a token like `123456:ABC-DEF...`. Keep it secret: anyone who has it controls the bot.
-2. **Group privacy turned off.** In @BotFather: `/mybots` → your bot → **Bot Settings → Group Privacy → Turn off**. Without this the bot cannot see links sent in a group.
-3. **Your group's ID.** Add the bot to your group and send `/id` there. It replies with a negative number such as `-1001234567890`.
-4. **The code.** Either `git clone` the repository, or download the ZIP from the repository page (**Code → Download ZIP**) and unzip it.
+```bash
+git clone https://github.com/etrntyy/IGXYTDL-for-friends.git igxytdl
+cd igxytdl
+```
 
-Optional: your own Telegram user ID (send `/id` to the bot in a private chat) if you want to use the bot outside the group.
+## The settings file
 
-For Instagram downloads you also need a cookies file (see [Instagram login cookies](#instagram-login-cookies)).
+The bot reads its settings from a file called `.env` inside that folder. The installers create it for you from `.env.example`, and you open it in any text editor (`nano .env` on Mac, Linux and Pi, Notepad on Windows). A working one looks like this, without the explanations after the `#`:
 
-You do **not** need to open any ports or change your router. The bot only makes outgoing connections.
+```
+TELEGRAM_BOT_TOKEN=123456:ABC-DEF...     # from @BotFather
+ALLOWED_CHATS=-1001234567890             # the group ID from /id; only this group can use the bot
+ALLOWED_USERS=                           # your own user ID (send /id to the bot privately) if you want private chat too
+COOKIES_FILE=                            # path to your Instagram cookies.txt, see below
+HOST_NAME=                               # name that /host shows, defaults to the computer's name
+SHARED_HOSTING=                          # 1 only when several devices run the bot with one token
+```
 
----
+Write the lines with no spaces around `=` and no quotes. If `ALLOWED_CHATS` and `ALLOWED_USERS` are both empty, anyone who finds the bot can use it. Restart the bot after any change; the command for each system is in [Starting, stopping and updating](#starting-stopping-and-updating).
 
-## Windows 10 / 11
+## Windows
 
-**1. Install Python**
-1. Go to python.org/downloads and download the latest **Python 3.12** (or newer) installer for Windows.
-2. Run it. On the first screen **tick "Add python.exe to PATH"**, then click **Install Now**.
-3. Check it worked: press `Win+R`, type `cmd`, press Enter, and run `python --version`. It should print a version number.
+1. Install Python 3.12 or newer from python.org/downloads. On the first screen of the installer tick "Add python.exe to PATH". Afterwards, `python --version` in Command Prompt should print a version.
+2. Put the unzipped code in a plain folder such as `C:\IGXYTDL`. Avoid folders that sync to OneDrive.
+3. Double-click `run.bat`. The first run builds a private Python environment and installs everything, which takes a few minutes. Then Notepad opens the settings file. Fill it in, save, close Notepad and press a key in the black window.
+4. When you see "Application started", send `/start` to the bot. Leave the window open (minimising is fine). If the bot crashes, `run.bat` starts it again after 10 seconds.
+5. To start with Windows, make a shortcut to `run.bat` (right-click, Show more options, Create shortcut), press `Win+R`, type `shell:startup` and drop the shortcut into that folder.
+6. To keep the laptop from sleeping, open Settings, System, Power & battery and set sleep to Never while plugged in. For the lid, use Control Panel, Power Options, "Choose what closing the lid does" and pick Do nothing.
 
-**2. Get the code**
-1. Unzip the download into a simple folder such as `C:\IGXYTDL`. Avoid folders that sync to OneDrive.
+The bot downloads its own ffmpeg if none is installed. If video merging or MP3 still fails, run `winget install Gyan.FFmpeg` and restart `run.bat`.
 
-**3. First run**
-1. Open the folder and double-click **`run.bat`**.
-2. The first time, it creates a private Python environment and installs everything (a few minutes, needs internet). The bot fetches its own copy of ffmpeg if none is installed.
-3. Notepad opens with the settings file. Fill it in as described in [The settings file](#the-settings-file-env), save, close Notepad, and press any key in the black window.
-4. The bot starts. You will see "Application started". Send `/start` to the bot in Telegram to test.
+## Mac
 
-Leave the window open; you can minimise it. If the bot crashes, `run.bat` restarts it after 10 seconds. Press `Ctrl+C` or close the window to stop it.
+1. You need Python 3.10 or newer. The installer from python.org works, or `brew install python` if you use Homebrew. Check with `python3 --version`.
+2. In the `igxytdl` folder run the installer. It makes the environment, installs the packages and asks for your token (paste it and press Enter, nothing shows as you type):
+   ```bash
+   ./scripts/install.sh
+   ```
+3. Fill in the rest of `.env`.
+4. To run the bot in the background, start it at every login and restart it after crashes:
+   ```bash
+   ./scripts/mac-service.sh install
+   ```
+5. Send `/start` to the bot. If nothing comes back, `./scripts/mac-service.sh logs` shows what it's doing.
 
-**4. Start automatically when Windows starts**
-1. Right-click `run.bat` → **Show more options → Create shortcut**.
-2. Press `Win+R`, type `shell:startup`, press Enter.
-3. Move the shortcut into the folder that opens.
+The service also stops the Mac from idle-sleeping while it's plugged in. A closed MacBook lid still puts it to sleep, and the bot picks up again when you open it. For a lid-closed setup you need an external display and power (clamshell mode). To try the bot without installing anything, use `./scripts/run-forever.sh` in a Terminal window instead of step 4.
 
-**5. Stop the PC from sleeping**
-1. **Settings → System → Power & battery → Screen and sleep.**
-2. Set "When plugged in, put my device to sleep after" to **Never**.
-3. Laptops: **Control Panel → Power Options → Choose what closing the lid does → When I close the lid: Do nothing** (for plugged in).
+If the log says "Operation not permitted", macOS is blocking background jobs from that folder. Move the `igxytdl` folder into your home folder and run step 4 again.
 
-**Optional: install ffmpeg yourself.** If video merging or MP3 fails, open Command Prompt and run `winget install Gyan.FFmpeg`, then restart `run.bat`.
-
----
+To remove the service: `./scripts/mac-service.sh uninstall`.
 
 ## Linux
 
-Tested approach for Ubuntu, Debian and Linux Mint (anything with `apt`). Fedora and Arch commands are below.
+This is written for Ubuntu, Debian and Mint. Other distributions are covered at the end.
 
-**1. Open a terminal and get the code**
-```bash
-sudo apt-get install -y git
-git clone https://github.com/etrntyy/IGXYTDL-for-friends.git igxytdl
-cd igxytdl
-```
-If you downloaded a ZIP instead: `unzip igxytdl-for-friend.zip && cd igxytdl`.
+1. Install git with `sudo apt-get install -y git`, get the code as described earlier, then run this inside the folder:
+   ```bash
+   ./scripts/install.sh --service
+   ```
+   It installs ffmpeg and Python's venv support (it asks for your sudo password), builds the environment, asks for your token, and creates a system service that starts at boot and restarts after a crash.
+2. Edit `.env` and restart the service.
+3. Follow the log with `journalctl -u igxytdl -f` until you see "Application started", then press Ctrl+C and send `/start` to the bot.
 
-**2. Install and start as a service**
-```bash
-./scripts/install.sh --service
-```
-The script:
-- installs `ffmpeg`, `python3-venv` and `python3-pip` (asks for your sudo password),
-- creates a private Python environment and installs the bot's packages,
-- asks for your **bot token** (paste it, press Enter; nothing shows as you type),
-- creates a system service that starts at every boot and restarts after a crash.
+Running it by hand is also fine for a test: `./scripts/run-forever.sh`.
 
-**3. Fill in the settings**
-```bash
-nano .env
-```
-Set the lines described in [The settings file](#the-settings-file-env). Save with `Ctrl+O`, `Enter`, exit with `Ctrl+X`, then:
-```bash
-sudo systemctl restart igxytdl
-```
+On Fedora, install `git python3 python3-pip` with dnf. On Arch or Manjaro, run `sudo pacman -S --needed git python python-pip ffmpeg`. Then, inside the folder:
 
-**4. Check it**
-```bash
-journalctl -u igxytdl -f
-```
-Look for "Application started". Press `Ctrl+C` to leave the log. Then send `/start` to the bot.
-
-**Other distributions (no `apt`)**
-
-Fedora:
-```bash
-sudo dnf install -y git python3 python3-pip
-```
-Arch / Manjaro:
-```bash
-sudo pacman -S --needed git python python-pip ffmpeg
-```
-Then, on either, from inside the `igxytdl` folder:
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && cp .env.example .env
 ```
-Edit `.env` (`nano .env`), then run the bot with `./scripts/run-forever.sh`. Without a system ffmpeg, the bot downloads its own copy on first start. To make it start on boot, copy `deploy/igxytdl.service` to `/etc/systemd/system/`, replace `__USER__` with your username and `__DIR__` with the full path of the folder, then `sudo systemctl enable --now igxytdl`.
 
-**Run it without a service (testing):** `./scripts/run-forever.sh` in the folder.
+Edit `.env` and start the bot with `./scripts/run-forever.sh`. To make it start at boot, copy `deploy/igxytdl.service` to `/etc/systemd/system/`, replace `__USER__` and `__DIR__` with your username and the folder's full path, and run `sudo systemctl enable --now igxytdl`. Without a system ffmpeg the bot fetches its own on first start.
 
----
+## Raspberry Pi 4
 
-## Raspberry Pi 4 Model B, 4 GB
+A 4 GB Pi 4 Model B is far more than the bot needs, and there's nothing to tune. What helps is the right hardware around it:
 
-The 4 GB model is more than enough: the bot uses roughly 70–100 MB of memory when idle and a few hundred MB while downloading, with almost no CPU use between downloads. You do not need to change swap or overclock anything.
+- the official 5V 3A USB-C power supply, since weak chargers cause random crashes
+- a microSD card of 16 GB or more, A1 or A2 rated (a USB SSD lasts longer under heavy use but isn't required)
+- a network cable if you can, because it's steadier than Wi-Fi
+- a cheap heatsink or fan, so the Pi doesn't slow itself down when busy
 
-**What you need**
-- Raspberry Pi 4 Model B (4 GB) and the **official 5V 3A USB-C power supply** (cheap chargers cause random crashes).
-- A microSD card, 16 GB or more, A1/A2 rated if possible.
-- A network cable (more reliable than Wi-Fi) or your Wi-Fi details.
-- A heatsink or small fan (optional but recommended).
-- A computer to prepare the card.
+Getting it running:
 
-**1. Write the operating system to the card**
-1. On your computer install **Raspberry Pi Imager** (raspberrypi.com/software) and open it.
-2. **Device:** Raspberry Pi 4. **Operating system:** *Raspberry Pi OS (other)* → **Raspberry Pi OS Lite (64-bit)**. **Storage:** your card.
-3. Click **Next**, then **Edit Settings** (customisation):
-   - **Hostname:** `igxytdl-pi`
-   - **Username and password:** choose a username (this guide writes it as `YOURUSER`) and a strong password.
-   - **Wi-Fi:** your network name and password (skip if you use a cable).
-   - **Services → Enable SSH → Use password authentication.**
-4. Save, confirm, and write. Wait for it to finish.
-
-**2. Boot the Pi and connect**
-1. Put the card in the Pi, connect the cable (if any), then connect power. Wait about 2 minutes for the first boot.
-2. On your computer open a terminal (Terminal on Mac/Linux; **Windows Terminal** or PowerShell on Windows) and connect:
+1. On another computer, install Raspberry Pi Imager from raspberrypi.com/software. Choose Raspberry Pi 4, then Raspberry Pi OS (other), then Raspberry Pi OS Lite (64-bit), then your card.
+2. Click Next, then Edit Settings. Set a hostname (`igxytdl-pi` is used below), a username and password, your Wi-Fi if you're not using a cable, and under Services turn on SSH with password login. Write the card.
+3. Put the card in the Pi, plug in network and power, and wait about two minutes. Then connect from your computer, with your own username in place of `YOURUSER`:
    ```bash
    ssh YOURUSER@igxytdl-pi.local
    ```
-   Type `yes` the first time, then your password. If `igxytdl-pi.local` is not found, look up the Pi's IP address in your router's device list and use `ssh YOURUSER@THAT-IP`.
+   If that name isn't found, take the Pi's IP address from your router's device list and use it instead.
+4. Update the system:
+   ```bash
+   sudo apt-get update && sudo apt-get full-upgrade -y
+   ```
+5. Get the code onto the Pi. With access to the repository, `sudo apt-get install -y git` and clone it as shown earlier. With a ZIP file, copy it over from your own computer and unpack it on the Pi:
+   ```bash
+   scp ~/Downloads/igxytdl-for-friend.zip YOURUSER@igxytdl-pi.local:~
+   ```
+   ```bash
+   sudo apt-get install -y unzip && unzip igxytdl-for-friend.zip
+   ```
+6. From here it's the same as [Linux](#linux): run `./scripts/install.sh --service` inside the folder, edit `.env`, restart the service and watch the log.
+7. Run `sudo reboot`, wait two minutes and send `/start` again. If the bot answers, it will survive power cuts.
 
-**3. Update the system** (a few minutes)
+## Android (Termux)
+
+1. Install Termux and Termux:Boot from F-Droid (f-droid.org). The Play Store versions are out of date.
+2. In Termux, run `pkg install -y git`, fetch the code the same way, and run the setup script in the folder:
+   ```bash
+   ./scripts/termux-setup.sh
+   ```
+3. Run `nano .env`, paste your token and the other settings, save with Ctrl+O and Enter, and leave with Ctrl+X.
+4. Start the bot with the same keep-alive script as on Linux, `./scripts/run-forever.sh`.
+5. So Android doesn't kill it, open Settings, Apps, Termux, Battery and set it to Unrestricted (the wording differs by brand), keep Termux's notification showing, and leave the phone plugged in and on Wi-Fi.
+6. Open the Termux:Boot app once. After that the bot starts by itself when the phone reboots.
+
+## Docker
+
+Install Docker first (Docker Desktop on Windows and Mac, `curl -fsSL https://get.docker.com | sh` on Linux and Pi). Then, in the `igxytdl` folder:
+
 ```bash
-sudo apt-get update && sudo apt-get full-upgrade -y
+cp .env.example .env
+mkdir -p data
+docker compose up -d --build
 ```
 
-**4. Get the code onto the Pi**
-
-Option A, from GitHub (needs access to the repository):
-```bash
-sudo apt-get install -y git
-git clone https://github.com/etrntyy/IGXYTDL-for-friends.git igxytdl
-cd igxytdl
-```
-Option B, from the ZIP file. On **your computer** (not the Pi):
-```bash
-scp ~/Downloads/igxytdl-for-friend.zip YOURUSER@igxytdl-pi.local:~
-```
-Then on the Pi:
-```bash
-sudo apt-get install -y unzip
-unzip igxytdl-for-friend.zip
-cd igxytdl
-```
-
-**5. Install and start**
-```bash
-./scripts/install.sh --service
-```
-It installs ffmpeg and the packages, asks for your bot token, and sets up a service that starts at boot and restarts on crashes. This takes a few minutes on the Pi.
-
-**6. Fill in the settings**
-```bash
-nano .env
-```
-Set the lines in [The settings file](#the-settings-file-env). Save with `Ctrl+O`, `Enter`, exit with `Ctrl+X`, then:
-```bash
-sudo systemctl restart igxytdl
-```
-
-**7. Check it**
-```bash
-journalctl -u igxytdl -f
-```
-You should see "Application started". Press `Ctrl+C` to leave. In Telegram send `/start` to your bot, then a YouTube link in the group.
-
-**8. Test that it survives a reboot**
-```bash
-sudo reboot
-```
-Wait two minutes, then send `/start` to the bot again. If it answers, the Pi is set up for good.
-
-**Raspberry Pi tips**
-- Keep it plugged in, ideally by cable, in a spot with some airflow.
-- Under heavy use a heatsink or fan stops the Pi 4 from slowing itself down.
-- Heavy use writes temporary video files; a good card (or a USB SSD) lasts longer.
-- yt-dlp updates itself automatically. If downloads stop working anyway, force an update: see [Updating](#updating-stopping-uninstalling).
-- To use it on several devices at once, set `SHARED_HOSTING=1` and a different `HOST_NAME` on each ([HOSTING.md](HOSTING.md), section F).
-
----
+Fill in `.env` before the last command. Settings and the cookies file live in `./data`, and Docker brings the bot back after crashes and reboots. The cookies path inside the container is `/data/cookies.txt`.
 
 ## Instagram login cookies
 
-Instagram blocks almost every download unless the bot is "logged in". The bot cannot log in itself, so you give it a copy of a login session, called **cookies**, exported from your browser. YouTube, X and Reddit work without this.
+Instagram refuses almost every download from something that isn't logged in, and the bot can't log in on its own. You give it a copy of a login session (cookies) taken from your browser. YouTube, X and Reddit don't need this.
 
-Use a **throwaway Instagram account**, not your main one. The cookie file is a full login for that account: anyone who has the file can act as that account until you log out of that session or change the password.
+Use a throwaway Instagram account, not your main one. The cookies file is a full login: whoever holds it can use that account until the session is logged out, with no password or 2FA code.
 
-**Part 1: export the cookies from Chrome (on any computer)**
-1. In Chrome, log in to instagram.com with the throwaway account. Make sure you can see the feed.
-2. Open the Chrome Web Store and search for **Get cookies.txt LOCALLY**. Click **Add to Chrome**, then **Add extension**.
-3. Click the puzzle-piece icon in Chrome's toolbar and pin the extension, so its icon is visible.
+Export the cookies from Chrome, on any computer:
+
+1. Log in to instagram.com with the throwaway account and make sure you can see the feed. Use the Chrome profile that has that account, so you don't export your main one by accident.
+2. In the Chrome Web Store, search for "Get cookies.txt LOCALLY", click Add to Chrome, then Add extension.
+3. Click the puzzle-piece icon in the toolbar and pin the extension.
 4. Open an instagram.com tab and click the extension's icon.
-5. Choose the **Netscape** format. This is the format the bot can read.
-6. Click **Export**. Chrome saves a file in your Downloads folder, usually named `www.instagram.com_cookies.txt`.
+5. Choose the Netscape format, which is the one the bot reads.
+6. Click Export. Chrome saves `www.instagram.com_cookies.txt` in Downloads.
 
-Do this in the Chrome profile where the throwaway account is logged in, so you don't export your main account by mistake.
+Move the file next to the bot, name it `cookies.txt`, and delete the original from Downloads so only one copy exists:
 
-**Part 2: put the file where the bot runs**
+| System | Command or step |
+|---|---|
+| Mac, Linux | `mv ~/Downloads/www.instagram.com_cookies.txt ~/igxytdl/cookies.txt && chmod 600 ~/igxytdl/cookies.txt` |
+| Raspberry Pi | From your own computer: `scp ~/Downloads/www.instagram.com_cookies.txt YOURUSER@igxytdl-pi.local:~/igxytdl/cookies.txt`, then on the Pi `chmod 600 ~/igxytdl/cookies.txt` |
+| Windows | Move the file into `C:\IGXYTDL` and rename it `cookies.txt` |
+| Docker | Put it in the `data` folder as `cookies.txt` (no `.env` change needed) |
 
-*Raspberry Pi (from your computer to the Pi; use your own username and hostname):*
-```bash
-scp ~/Downloads/www.instagram.com_cookies.txt YOURUSER@igxytdl-pi.local:~/igxytdl/cookies.txt
-```
-Then, on the Pi, lock the file down so only your user can read it:
-```bash
-chmod 600 ~/igxytdl/cookies.txt
-```
+Then point `COOKIES_FILE` in `.env` at the full path, for example `/home/YOURUSER/igxytdl/cookies.txt` or `C:\IGXYTDL\cookies.txt`, and restart the bot.
 
-*Linux (same computer):*
-```bash
-mv ~/Downloads/www.instagram.com_cookies.txt ~/igxytdl/cookies.txt && chmod 600 ~/igxytdl/cookies.txt
-```
+Cookies expire after a while. When Instagram links start failing with "empty media response", export fresh ones and replace the file.
 
-*Windows:* move `www.instagram.com_cookies.txt` from Downloads into the bot's folder (for example `C:\IGXYTDL`) and rename it `cookies.txt`.
+A few rules for the cookies file:
 
-Then delete the original from your Downloads folder, so only one copy exists.
+- Don't send it in a chat or email, and keep it out of repositories, zips and synced folders such as Drive, Dropbox or iCloud. It's already in `.gitignore`.
+- Everyone who hosts the bot uses their own account and their own file. A device with no cookies still serves the other three sites.
+- Turn on two-factor login for the throwaway account. It won't stop a stolen cookies file from working, but it stops anyone from signing in with the password or changing the password and email, so you can still recover the account.
+- Only people with access to the device can read the file, so treat the device accordingly.
+- If it leaks, or you stop using it, change that account's password and then log out every session (Instagram, Settings, Accounts Center, Password and security, Where you're logged in). The old cookies stop working straight away. Delete the file afterwards.
+- Every Instagram link sent to the group is fetched as that account. If the account follows private accounts, anyone in the group can download their posts, and Instagram sees the activity coming from the host's connection. Follow nobody private with it.
+- Run only the code from this repository. A modified copy could send your cookies somewhere else.
 
-**Part 3: point the bot at it**
+## Starting, stopping and updating
 
-Open `.env` and set the full path:
-```
-COOKIES_FILE=/home/YOURUSER/igxytdl/cookies.txt        # Raspberry Pi / Linux
-COOKIES_FILE=C:\IGXYTDL\cookies.txt                     # Windows
-```
-Restart the bot: `sudo systemctl restart igxytdl` on Linux and the Pi, or close and reopen `run.bat` on Windows.
+yt-dlp keeps itself current. The bot runs `pip install -U yt-dlp` each time it starts and again every 24 hours. If a newer version arrived, it waits until no download is running, shuts down cleanly and starts itself again to load it. That restart doesn't depend on the service, `run.bat` or Docker. If the update fails (no internet, say), it logs a warning and carries on with the version it has. `AUTO_UPDATE_YTDLP=0` in `.env` turns this off, and `YTDLP_UPDATE_HOURS=12` changes the interval (`0` means only at start).
 
-**Part 4: keep it working**
-- Cookies expire after a while. If Instagram links start failing with "empty media response", export fresh cookies (Part 1) and repeat Parts 2 and 3.
+Everyday jobs:
 
-**Security recommendations (please read)**
-- **Use a throwaway account, never your main one.** If it gets flagged, banned or leaked, you lose nothing that matters. Instagram can ban accounts used by bots.
-- **Never share your `cookies.txt`.** It is a full login. Anyone who has it can view the account, read its messages and post as it, without a password or 2FA code, until that session is logged out. Never send it in a chat or email, and never put it in a repository, a zip, or a cloud folder (Drive, Dropbox, iCloud).
-- **Each host uses their own account and their own cookies.** Do not copy one person's file to another device or ask anyone for theirs. A device without cookies still serves YouTube, X and Reddit.
-- **Turn on two-factor authentication (2FA)** on the throwaway account. 2FA does not stop a stolen cookie file from working, but it stops anyone from logging in with the password or changing the account's password and email, so you can still recover the account.
-- **Lock the file down** so only your user can read it (`chmod 600` on Linux and the Pi), and keep the device itself private: anyone with access to the Pi or computer can read the file.
-- **Delete the original download** from your Downloads folder after you copy it.
-- **If it leaks or you stop using it:** change that account's password, then in Instagram open **Settings → Accounts Center → Password and security → Where you're logged in** and log out every session. That makes the exported cookies useless immediately. Then delete `cookies.txt` from the device.
-- **Remember what the bot does with the account:** every Instagram link sent in the group is fetched *as that account*. Posts from private accounts that the throwaway account follows can be downloaded by anyone in the group, and Instagram sees the activity from the host's internet connection. Follow nobody private with it.
-- **Only run code you trust.** A modified copy of the bot could send your cookies elsewhere. Get the code only from the repository.
+| | Windows | Mac | Linux and Pi |
+|---|---|---|---|
+| Logs | the black window | `./scripts/mac-service.sh logs` | `journalctl -u igxytdl -f` |
+| Restart | close the window, double-click `run.bat` | `./scripts/mac-service.sh restart` | `sudo systemctl restart igxytdl` |
+| Stop | close the window | `./scripts/mac-service.sh uninstall` | `sudo systemctl stop igxytdl` |
+| Remove it | delete the folder and the startup shortcut | `./scripts/mac-service.sh uninstall`, delete the folder | `sudo systemctl disable --now igxytdl && sudo rm /etc/systemd/system/igxytdl.service`, delete the folder |
 
----
-
-## Running on more than one device: who is active?
-
-You can run the bot on several devices with the same token (set `SHARED_HOSTING=1` and a different `HOST_NAME` on each; see [HOSTING.md](HOSTING.md), section F). Only one of them answers at a time. Here is how they take turns:
-
-- **There is no priority.** Whichever device claims the bot first stays in charge until it stops, and the others wait as backups. No device is better than another, and the bot does not pick the faster one.
-- **One starts first:** it becomes the active host. The second one starts, sees the claim, and waits.
-- **Both start at the same moment:** each writes its claim, waits a few seconds, and checks who won. The last claim wins, which is essentially random.
-- **The active device stays active** even if the other one is faster or comes online later. It only hands over when the active one stops, crashes or loses internet, and then within about 90 seconds (or under half a minute after a clean shutdown).
-- **Resources are not shared.** Telegram lets only one program fetch the bot's messages at a time, so only one device handles links. The backup does nothing, so a second device adds reliability, not extra speed.
-- **Instagram:** only the active device uses its own cookies, so Instagram links work only while a device with working cookies is the active one. Send `/host` in the group to see which device is answering.
-
----
-
-## The settings file (.env)
-
-The settings live in a file named `.env` in the bot's folder. The installer creates it from `.env.example`. These are the lines that matter:
-
-```
-TELEGRAM_BOT_TOKEN=123456:ABC-DEF...     # required: from @BotFather
-ALLOWED_CHATS=-1001234567890             # only this group can use the bot
-ALLOWED_USERS=                           # optional: your Telegram user IDs, comma-separated, to also allow private chat
-COOKIES_FILE=                            # for Instagram downloads: full path to your Instagram cookies.txt
-HOST_NAME=igxytdl-pi                     # optional: name shown by /host
-SHARED_HOSTING=                          # set to 1 only if several devices run this bot with the same token
-```
-
-Notes:
-- Use no spaces around `=` and no quotes. The `# ...` explanations after each line are optional; you can delete them.
-- If `ALLOWED_CHATS` and `ALLOWED_USERS` are both empty, **anyone** who finds the bot can use it.
-- Restart the bot after changing the file.
-
----
-
-## Updating, stopping, uninstalling
-
-| | Windows | Linux / Raspberry Pi |
-|---|---|---|
-| **Force a yt-dlp update now** (it also updates itself) | `.venv\Scripts\pip install -U yt-dlp`, then close and reopen `run.bat` | `cd ~/igxytdl && .venv/bin/pip install -U yt-dlp && sudo systemctl restart igxytdl` |
-| **Update the bot code** | Download the new ZIP, copy over your `.env` | `cd ~/igxytdl && git pull && .venv/bin/pip install -U -r requirements.txt && sudo systemctl restart igxytdl` |
-| **Stop** | Close the window or `Ctrl+C` | `sudo systemctl stop igxytdl` |
-| **Restart** | Close and double-click `run.bat` | `sudo systemctl restart igxytdl` |
-| **Logs** | The black window | `journalctl -u igxytdl -f` |
-| **Uninstall** | Delete the folder and the startup shortcut | `sudo systemctl disable --now igxytdl && sudo rm /etc/systemd/system/igxytdl.service`, then delete the folder |
-
-**Other systems, force a yt-dlp update:**
-- **Mac or Linux without the service:** `cd ~/igxytdl && .venv/bin/pip install -U yt-dlp`, then stop the bot (`Ctrl+C`) and start it again (`./scripts/run-forever.sh` restarts it by itself).
-- **Android (Termux):** `cd ~/igxytdl && pip install -U yt-dlp`, then stop (`Ctrl+C`) and start again.
-- **Docker:** `docker compose up -d --build` (or just `docker compose restart bot`; the bot updates yt-dlp when it starts).
-
-**Automatic yt-dlp updates.** YouTube and Instagram change often, so the bot keeps yt-dlp current on its own:
-- It runs `pip install -U yt-dlp` every time it starts.
-- It checks again every 24 hours. If a newer version was installed, it waits until no download is running, stops cleanly and starts itself again, so the new version is loaded. The service, `run.bat` or Docker are not involved in that restart.
-- It needs internet access and permission to install packages into its own folder. If the update fails (for example, no internet), it logs a warning and keeps running with the version it has.
-- Settings in `.env`: `AUTO_UPDATE_YTDLP=0` turns it off; `YTDLP_UPDATE_HOURS=12` changes how often it checks (`0` means only at start).
-
----
+To update yt-dlp right away, run `pip install -U yt-dlp` from inside the folder and restart the bot. The pip command lives at `.venv/bin/pip` on Mac, Linux and Pi, at `.venv\Scripts\pip` on Windows, and is plain `pip` in Termux. To update the bot itself, run `git pull` (or unpack a new ZIP and keep your `.env`) and restart. In Termux, "restart" means Ctrl+C and `./scripts/run-forever.sh` again. With Docker, `docker compose up -d --build` rebuilds the image and `docker compose logs -f` follows the log.
 
 ## Troubleshooting
 
-| Problem | Fix |
+| What you see | What to do |
 |---|---|
-| `python` is not recognised (Windows) | Reinstall Python and tick **Add python.exe to PATH**. |
-| `ssh: Could not resolve hostname igxytdl-pi.local` | Wait a minute and retry, or use the Pi's IP address from your router. |
-| Bot does not react to links in the group | Group Privacy is still on, the bot was not re-added after turning it off, or `ALLOWED_CHATS` has the wrong ID (send `/id` in the group). |
-| `Conflict: terminated by other getUpdates request` | Another copy is running with the same token. Stop it, or set `SHARED_HOSTING=1` on all copies. |
-| YouTube: "Sign in to confirm you're not a bot" | Update yt-dlp, try again later, or use a YouTube `cookies.txt`. |
-| Instagram: "empty media response" | Cookies are missing or expired. Export fresh ones ([Instagram login cookies](#instagram-login-cookies)). |
-| Videos over 50 MB are skipped | Telegram's limit for bots. The bot picks a lower quality automatically; very long videos may only fit at 360p or less. |
-| Service will not start (Linux/Pi) | Run `journalctl -u igxytdl -n 50` and read the last lines. A missing or wrong token in `.env` is the usual cause. |
+| `python` isn't recognised on Windows | Reinstall Python with "Add python.exe to PATH" ticked |
+| `Could not resolve hostname igxytdl-pi.local` | Give the Pi another minute to boot, or connect by IP address as described in the Pi section |
+| The bot ignores links in the group | Group Privacy is still on (turn it off, then remove and re-add the bot), or `ALLOWED_CHATS` holds the wrong ID. Send `/id` in the group to check |
+| `Conflict: terminated by other getUpdates request` | Another copy is running with the same token. Stop it, or set `SHARED_HOSTING=1` on all of them |
+| YouTube says "Sign in to confirm you're not a bot" | Force a yt-dlp update, wait a while, or add cookies from a YouTube login |
+| Instagram says "empty media response" | The cookies are missing, expired or from a logged-out session. Export new ones |
+| A video is missing or low quality | Telegram limits bots to 50 MB, so very long videos only fit at 360p or lower |
+| The service won't start on Linux or Pi | `journalctl -u igxytdl -n 50` shows why. A wrong or empty token in `.env` is the usual cause |

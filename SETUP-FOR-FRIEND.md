@@ -1,130 +1,26 @@
-# Setting up the bot on a Raspberry Pi 4 (for a friend hosting it)
+# Hosting the group's bot on your Pi
 
-You are going to keep a copy of the group's download bot running on your Raspberry Pi. When your Pi is on and online it serves the group; when it is off, someone else's device takes over. It is lightweight (about 70 MB of memory) and only needs the Pi to stay powered and connected to the internet.
+Thanks for helping out. You'll run a copy of the group's download bot on your Raspberry Pi. While your Pi is on and online it answers the group, and when it's off another device takes over. It barely uses any of the Pi's resources.
 
-**You need from the person who runs the group (send these privately, never in the group chat):**
-1. The **bot token** (a long string like `123456:ABC...`). Treat it like a password: anyone with it controls the bot.
-2. The **group ID** (a negative number like `-100…`).
-3. The code, as `igxytdl-for-friend.zip` or a GitHub invite.
+The person who runs the group needs to send you three things, privately and never in the group chat:
 
-For Instagram downloads you need your own login cookies (see the Instagram section below). YouTube, X and Reddit work without them, and Instagram links simply fail while your Pi is the active host and has no cookies. Never ask anyone else for their Instagram cookies, and never share yours.
+- the bot token, a long string like `123456:ABC...`
+- the group ID, a negative number like `-100...`
+- the code, either as `igxytdl-for-friend.zip` or as an invite to the GitHub repository
 
----
+Then:
 
-## 1. Get the Pi ready (skip if it already runs Raspberry Pi OS)
-
-1. On your computer install **Raspberry Pi Imager** (raspberrypi.com/software).
-2. Pick **Raspberry Pi 4**, **Raspberry Pi OS Lite (64-bit)**, your memory card.
-3. Click **Next → Edit Settings**: set a hostname (for example `igxytdl-pi`), a username and password, your Wi-Fi (skip for a cable), and turn on **Enable SSH**.
-4. Write the card, put it in the Pi, power it on, wait 2 minutes.
-5. Open a terminal on your computer and connect (use your own hostname and username):
-   ```bash
-   ssh YOURUSER@igxytdl-pi.local
+1. Follow the [Raspberry Pi 4 section of INSTALL.md](INSTALL.md#raspberry-pi-4). It takes you from a blank memory card to a bot that starts by itself at every boot.
+2. When you reach the settings file, make sure `.env` contains these three lines, with your own name in the last one (something like `sam-pi`):
    ```
-   (Or plug in a keyboard and screen and use the Pi directly.)
-
-## 2. Get the code onto the Pi
-
-**If you received the zip file**, on your computer (replace the names with yours):
-```bash
-scp ~/Downloads/igxytdl-for-friend.zip YOURUSER@igxytdl-pi.local:~
-```
-Then on the Pi:
-```bash
-sudo apt-get install -y unzip
-unzip igxytdl-for-friend.zip
-cd igxytdl
-```
-
-**If you were invited to the GitHub repository**, on the Pi:
-```bash
-sudo apt-get install -y git
-git clone https://github.com/etrntyy/IGXYTDL-for-friends.git igxytdl
-cd igxytdl
-```
-(GitHub asks for your username and a personal access token with read access to the repository as the password.)
-
-## 3. Install
-
-Still in the `igxytdl` folder:
-```bash
-./scripts/install.sh --service
-```
-- It asks for your sudo password (to install ffmpeg), then for the **bot token**: paste it and press Enter.
-- It installs everything and starts the bot as a background service that also starts on every boot and restarts after crashes.
-
-## 4. Settings
-
-```bash
-nano .env
-```
-Make sure these lines are set (the token line is already filled in):
-```
-ALLOWED_CHATS=PUT-THE-GROUP-ID-HERE
-SHARED_HOSTING=1
-HOST_NAME=PUT-A-NAME-HERE        # for example: sam-pi
-```
-Leave `COOKIES_FILE` empty. Save with `Ctrl+O`, `Enter`; exit with `Ctrl+X`. Then restart:
-```bash
-sudo systemctl restart igxytdl
-```
-
-## 5. Check that it works
-
-```bash
-journalctl -u igxytdl -f
-```
-Within a minute you should see a line saying this device is the active host, or that it is waiting (another device is active). Press `Ctrl+C` to leave the log.
-
-In the group, send `/host`. The bot answers **Running on: …** with the name of whichever device is currently active. To confirm yours works, ask the other host to stop theirs for a moment: `/host` should then show your `HOST_NAME` within about 90 seconds.
-
-## Instagram downloads: your own login
-
-Use a **throwaway Instagram account**, not your main one. The cookie file is a full login for that account: anyone who has the file can act as that account until you log out of it or change its password.
-
-1. In Chrome, log in to instagram.com with the throwaway account. Make sure you can see the feed.
-2. Open the Chrome Web Store and search for **Get cookies.txt LOCALLY**. Click **Add to Chrome**, then **Add extension**.
-3. Click the puzzle-piece icon in Chrome's toolbar and pin the extension, so its icon is visible.
-4. Open an instagram.com tab and click the extension's icon.
-5. Choose the **Netscape** format. This is the format the bot can read.
-6. Click **Export**. Chrome saves a file in your Downloads folder, usually named `www.instagram.com_cookies.txt`.
-7. Copy it to the Pi (use your own names), then delete it from your Downloads folder:
-   ```bash
-   scp ~/Downloads/www.instagram.com_cookies.txt YOURUSER@igxytdl-pi.local:~/igxytdl/cookies.txt
+   ALLOWED_CHATS=the-group-id
+   SHARED_HOSTING=1
+   HOST_NAME=sam-pi
    ```
-8. On the Pi, lock the file down and point the bot at it:
-   ```bash
-   chmod 600 ~/igxytdl/cookies.txt
-   nano ~/igxytdl/.env
-   ```
-   Set `COOKIES_FILE=/home/YOURUSER/igxytdl/cookies.txt` (your real username), save, then `sudo systemctl restart igxytdl`.
-9. Cookies expire after a while. If Instagram links start failing with "empty media response", export fresh ones and repeat.
+3. Restart the bot and send `/host` in the group. It replies "Running on:" followed by the name of whichever device is currently answering. To see yours take over, ask the other host to stop their copy for a moment. It should show your name within about 90 seconds.
 
-**Security recommendations (please read)**
-- **Use a throwaway account, never your main one.** If it gets flagged, banned or leaked, you lose nothing that matters. Instagram can ban accounts used by bots.
-- **Never share your `cookies.txt`.** It is a full login. Anyone who has it can view the account, read its messages and post as it, without a password or 2FA code, until that session is logged out. Never send it in a chat or email, and never put it in a repository, a zip, or a cloud folder (Drive, Dropbox, iCloud).
-- **Each host uses their own account and their own cookies.** Do not copy one person's file to another device or ask anyone for theirs. A device without cookies still serves YouTube, X and Reddit.
-- **Turn on two-factor authentication (2FA)** on the throwaway account. 2FA does not stop a stolen cookie file from working, but it stops anyone from logging in with the password or changing the account's password and email, so you can still recover the account.
-- **Lock the file down** so only your user can read it (`chmod 600` on Linux and the Pi), and keep the device itself private: anyone with access to the Pi or computer can read the file.
-- **Delete the original download** from your Downloads folder after you copy it.
-- **If it leaks or you stop using it:** change that account's password, then in Instagram open **Settings → Accounts Center → Password and security → Where you're logged in** and log out every session. That makes the exported cookies useless immediately. Then delete `cookies.txt` from the device.
-- **Remember what the bot does with the account:** every Instagram link sent in the group is fetched *as that account*. Posts from private accounts that the throwaway account follows can be downloaded by anyone in the group, and Instagram sees the activity from the host's internet connection. Follow nobody private with it.
-- **Only run code you trust.** A modified copy of the bot could send your cookies elsewhere. Get the code only from the repository.
+How the devices take turns is explained in [HOSTING.md](HOSTING.md#several-devices-one-bot). The short version: only one answers at a time, whoever claimed the bot first keeps it until it goes offline, and nothing is shared between them.
 
-## Day to day
+Instagram is optional on your side. Without cookies your Pi still handles YouTube, X and Reddit, and Instagram links just fail while your Pi is the one answering. If you want Instagram too, set up your own throwaway account following [Instagram login cookies](INSTALL.md#instagram-login-cookies). Don't ask anyone for their cookies and don't share yours.
 
-| Task | Command |
-|---|---|
-| See what it's doing | `journalctl -u igxytdl -f` |
-| Restart | `sudo systemctl restart igxytdl` |
-| Stop | `sudo systemctl stop igxytdl` |
-| Force a yt-dlp update now (it also updates itself every day) | `cd ~/igxytdl && .venv/bin/pip install -U yt-dlp && sudo systemctl restart igxytdl` |
-
-## Good to know
-
-- **Two copies only if both use `SHARED_HOSTING=1`.** A copy without it will fight the others over the token.
-- **Protect the token.** Don't paste it in chats, screenshots or public repos. If you stop hosting, tell the group owner so they can revoke it.
-- **The bot only works in the group** named in `ALLOWED_CHATS` (and for the owner's own accounts).
-- **Taking turns:** only one device answers at a time. Whichever claimed the bot first stays active until it stops or goes offline, then another takes over within about 90 seconds. Your Pi being on does not make it faster or slower, and it will not share work with the other device.
-- **Pi tips:** use the official 5V 3A power adapter, add a cheap heatsink or fan, and use a network cable if you can. The bot itself needs only about 2% of a 4 GB Pi's memory and almost no CPU while idle (see HOSTING.md, section A).
-- **Your home connection** is what downloads videos, and your upload speed sends them, so large clips can take a while.
+Keep the token to yourself, and if you stop hosting, tell the group owner so they can replace it.
