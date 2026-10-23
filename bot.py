@@ -85,7 +85,7 @@ SITES = {  # name -> (domains, auto-download default)
     "x": (("twitter.com", "x.com", "t.co", "fxtwitter.com", "vxtwitter.com"), True),
     "reddit": (("reddit.com", "redd.it"), True),
     "youtube": (("youtube.com", "youtu.be"), True),
-    "tiktok": (("tiktok.com",), True),
+    "tiktok": (("tiktok.com",), False),
 }
 SITE_ALIASES = {"twitter": "x", "yt": "youtube", "ig": "instagram", "insta": "instagram", "tt": "tiktok"}
 YOUTUBE_RE = re.compile(r"(youtube\.com|youtu\.be)", re.I)

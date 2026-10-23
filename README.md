@@ -8,7 +8,7 @@ A Telegram bot for a group chat. Drop an Instagram, YouTube, TikTok, X (Twitter)
 
 - Videos come back in the best quality that fits under Telegram's 50 MB limit for bots, with their original proportions (vertical clips stay vertical). If the best version is too big, it tries the next one down, so a long video may end up at 360p.
 - Photo posts and carousels come back as JPG, with a mix of photos and videos sent together as an album.
-- All five sites download as soon as someone posts a link. `/autodownload` turns that off per site, and then the link gets a small menu (best, 1080p, 720p, 480p, 360p, MP3) and nothing happens until someone taps.
+- Instagram, YouTube, X and Reddit links download as soon as someone posts them. TikTok is off by default, so a TikTok link gets the small menu (best, 1080p, 720p, 480p, 360p, MP3) and nothing happens until someone taps. `/autodownload` changes this per site, for example `/autodownload tiktok on`.
 - Every video has a button to get its audio as an MP3.
 - If a link can't be downloaded, the bot stays quiet instead of posting an error. The reason is written to the log.
 - yt-dlp updates itself every day, so YouTube and Instagram changes get picked up without you doing anything.
