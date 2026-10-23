@@ -1,6 +1,6 @@
 # Installing the bot
 
-Get the code and fill in the settings file first, then jump to your system: [Windows](#windows), [Mac](#mac), [Linux](#linux), [Raspberry Pi 4](#raspberry-pi-4), [Android](#android-termux) or [Docker](#docker). Instagram cookies, Reddit access, files over 50 MB, updating and troubleshooting come after.
+Get the code and fill in the settings file first, then jump to your system: [Windows](#windows), [Mac](#mac), [Linux](#linux), [Raspberry Pi 4](#raspberry-pi-4), [Pi with Arch Linux](#raspberry-pi-with-arch-linux-arm), [Android](#android-termux) or [Docker](#docker). Instagram cookies, Reddit access, files over 50 MB, updating and troubleshooting come after.
 
 Nothing here needs open ports or router changes. The bot only connects outward.
 
@@ -106,6 +106,26 @@ Edit `.env` and start the bot with `./scripts/run-forever.sh`. To make it start 
    ```
 6. From here it's the same as [Linux](#linux): run `./scripts/install.sh --service` inside the folder, edit `.env`, restart the service and watch the log.
 7. Run `sudo reboot`, wait two minutes and send `/start` again. If the bot answers, it will survive power cuts.
+
+## Raspberry Pi with Arch Linux ARM
+
+Raspberry Pi OS above is the easier road. Use Arch only if you already prefer it. The bot itself runs the same on either, so this section covers just what's different.
+
+Putting Arch Linux ARM on the card is a manual job (partitioning the card and unpacking an image) and the steps change between releases, so follow the current instructions on the Arch Linux ARM site, on the Raspberry Pi 4 page under its "aarch64" install. They need a Linux computer to prepare the card; a Mac or Windows PC can't do it directly.
+
+After the first boot:
+
+1. Log in over SSH as `alarm` (password `alarm`), switch to root with `su -` (password `root`), and change both passwords straight away with `passwd` and `passwd alarm`.
+2. Set up the package keys and bring the system up to date:
+   ```bash
+   pacman-key --init && pacman-key --populate archlinuxarm && pacman -Syu
+   ```
+3. Install what the bot needs. Arch doesn't ship `sudo`, so add it and let the `wheel` group use it (`visudo`, then remove the `#` in front of the `%wheel` line):
+   ```bash
+   pacman -S --needed sudo git python python-pip ffmpeg
+   ```
+4. Log out of root and carry on as `alarm`. Get the code as described earlier, then follow the Arch and Manjaro steps under [Linux](#linux): create the environment, fill in `.env`, and install the systemd service so the bot starts at boot.
+5. Check that the clock is right with `timedatectl`. A Pi has no clock battery, and a wrong date makes the secure connections to Telegram fail.
 
 ## Android (Termux)
 
