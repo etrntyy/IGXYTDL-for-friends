@@ -1,6 +1,6 @@
 # Installing the bot
 
-Get the code and fill in the settings file first, then jump to your system: [Windows](#windows), [Mac](#mac), [Linux](#linux), [Raspberry Pi 4](#raspberry-pi-4), [Android](#android-termux) or [Docker](#docker). Instagram cookies, Reddit access, updating and troubleshooting come after.
+Get the code and fill in the settings file first, then jump to your system: [Windows](#windows), [Mac](#mac), [Linux](#linux), [Raspberry Pi 4](#raspberry-pi-4), [Android](#android-termux) or [Docker](#docker). Instagram cookies, Reddit access, files over 50 MB, updating and troubleshooting come after.
 
 Nothing here needs open ports or router changes. The bot only connects outward.
 
@@ -26,6 +26,7 @@ REDDIT_CLIENT_ID=                        # free Reddit API key, see Reddit acces
 REDDIT_CLIENT_SECRET=
 HOST_NAME=                               # name that /host shows, defaults to the computer's name
 SHARED_HOSTING=                          # 1 only when several devices run the bot with one token
+TELEGRAM_API_BASE=                       # address of a local Bot API server, only for files over 50 MB, see below
 ```
 
 Write the lines with no spaces around `=` and no quotes. If `ALLOWED_CHATS` and `ALLOWED_USERS` are both empty, anyone who finds the bot can use it. Restart the bot after any change; the command for each system is in [Starting, stopping and updating](#starting-stopping-and-updating).
@@ -205,6 +206,31 @@ This is the same idea as the Instagram cookies, with a Reddit login. Use a spare
 
 The rules for the Instagram cookies file apply here too: keep it private, one account per host, two-factor login on, and change the account's password if the file ever leaks.
 
+## Files over 50 MB
+
+Through Telegram's normal servers a bot can send files up to 50 MB. If you run Telegram's own Bot API server on the same machine, the limit becomes 2 GB. It costs nothing: the program is open source and the only price is the machine it runs on. You also need a free API ID and hash, which come from Telegram.
+
+One drawback decides whether this is for you. Once the bot is logged in to your local server, only that machine can receive its messages. A second device still pointing at Telegram's normal servers can't take over, so this doesn't combine with [shared hosting](HOSTING.md#several-devices-one-bot). It's either failover with the 50 MB limit, or one machine with 2 GB.
+
+1. Go to my.telegram.org, log in with your phone number, open "API development tools" and create an app (any name). Copy the `api_id` and `api_hash`, and keep them private.
+2. Start the server. With Docker (the image is the community build of Telegram's program, so check its page on Docker Hub if the container won't start):
+   ```bash
+   docker run -d --name tgapi --restart unless-stopped -p 8081:8081 -e TELEGRAM_API_ID=YOUR_ID -e TELEGRAM_API_HASH=YOUR_HASH -e TELEGRAM_LOCAL=1 -v tgapi-data:/var/lib/telegram-bot-api aiogram/telegram-bot-api:latest
+   ```
+   Without Docker you have to build the program from source, following the instructions in the [tdlib/telegram-bot-api](https://github.com/tdlib/telegram-bot-api) repository.
+3. Log the bot out of Telegram's normal servers. A bot can only be connected to one server, and this is the step people miss. From the bot's folder on Mac or Linux:
+   ```bash
+   curl "https://api.telegram.org/bot$(grep '^TELEGRAM_BOT_TOKEN=' .env | cut -d= -f2)/logOut"
+   ```
+   It should answer `{"ok":true,"result":true}`. After this the bot can't go back to the normal servers for about 10 minutes.
+4. Add this line to `.env` and restart the bot. The upload limit then becomes 2000 MB on its own:
+   ```
+   TELEGRAM_API_BASE=http://localhost:8081
+   ```
+5. Send a link to check. The server needs a few GB of free disk for the files it handles, and a big video takes a while to download and upload on a home connection.
+
+To undo it, remove the `TELEGRAM_API_BASE` line. The bot then has to be logged out of your local server before Telegram's normal servers will accept it again, so read the Bot API server's own documentation first.
+
 ## Starting, stopping and updating
 
 yt-dlp keeps itself current. The bot runs `pip install -U yt-dlp` each time it starts and again every 24 hours. If a newer version arrived, it waits until no download is running, shuts down cleanly and starts itself again to load it. That restart doesn't depend on the service, `run.bat` or Docker. If the update fails (no internet, say), it logs a warning and carries on with the version it has. `AUTO_UPDATE_YTDLP=0` in `.env` turns this off, and `YTDLP_UPDATE_HOURS=12` changes the interval (`0` means only at start).
@@ -233,5 +259,5 @@ When a link can't be downloaded the bot says nothing in the chat, it just remove
 | The log shows "Sign in to confirm you're not a bot" for YouTube | Force a yt-dlp update, wait a while, or add cookies from a YouTube login |
 | The log shows "empty media response" for Instagram | The cookies are missing, expired or from a logged-out session. Export new ones |
 | The log shows "Account authentication is required" or "needs a login" for Reddit | Add Reddit API keys or cookies, see [Reddit access](#reddit-access). Cookies expire, so export fresh ones if it worked before |
-| A video is missing or low quality | Telegram limits bots to 50 MB, so very long videos only fit at 360p or lower |
+| A video is missing or low quality | Telegram limits bots to 50 MB, so very long videos only fit at 360p or lower. [Files over 50 MB](#files-over-50-mb) explains how to raise it |
 | The service won't start on Linux or Pi | `journalctl -u igxytdl -n 50` shows why. A wrong or empty token in `.env` is the usual cause |
