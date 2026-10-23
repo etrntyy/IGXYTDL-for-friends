@@ -30,7 +30,7 @@ If a few friends will host the same bot so it stays up when one device is off, r
 
 ## Good to know
 
-- Reddit images and galleries need free API keys (a "script" app at reddit.com/prefs/apps) in `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET`. Without them Reddit usually blocks the request. Reddit videos work either way.
+- Reddit needs a login now. Add free API keys (or cookies) and videos, images and galleries all work; the steps are in [INSTALL.md](INSTALL.md#reddit-access).
 - X photo tweets work with no setup. Instagram needs login cookies, covered in [INSTALL.md](INSTALL.md#instagram-login-cookies).
 - To lift the 50 MB limit to 2 GB, run Telegram's own [Bot API server](https://github.com/tdlib/telegram-bot-api) and set `TELEGRAM_API_BASE` to its address.
 - Set `ALLOWED_CHATS` so only your group can use the bot. The settings are explained in [INSTALL.md](INSTALL.md#the-settings-file).

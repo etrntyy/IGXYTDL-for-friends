@@ -156,11 +156,25 @@ def _reddit_json(path: str) -> list:
     return r.json()
 
 
-def _reddit_images(url: str) -> list[str]:
+def _reddit_post(url: str) -> dict:
     final = httpx.head(url, headers={"User-Agent": UA}, follow_redirects=True, timeout=30).url  # resolves redd.it and /s/ links
     data = _reddit_json(final.path.rstrip("/"))
     post = data[0]["data"]["children"][0]["data"]
-    post = (post.get("crosspost_parent_list") or [post])[0]
+    return (post.get("crosspost_parent_list") or [post])[0]
+
+
+def _reddit_video_source(post: dict) -> str | None:
+    """Where the post's video really lives: Reddit's own stream, or a link to YouTube, X and so on."""
+    rv = (post.get("secure_media") or post.get("media") or {}).get("reddit_video") or {}
+    rv = rv or ((post.get("preview") or {}).get("reddit_video_preview") or {})
+    if rv.get("hls_url") or rv.get("fallback_url"):
+        return rv.get("hls_url") or rv["fallback_url"]  # the HLS stream has the sound; the fallback file is silent
+    link = post.get("url") or ""
+    return link if SITE_RE.match(link) and site_of(link) != "reddit" else None
+
+
+def _reddit_images(url: str) -> list[str]:
+    post = _reddit_post(url)
     meta = post.get("media_metadata") or {}
     if post.get("gallery_data"):
         urls = []
@@ -231,12 +245,21 @@ def download(url: str, outdir: Path, fmt: str) -> list[Path]:
         files = _ytdlp(url, outdir, "audio", None) if kind == "audio" else _video(url, outdir, opt)
     except yt_dlp.utils.DownloadError as e:
         err = e
+    if not files and site_of(url) == "reddit":  # yt-dlp can't read Reddit pages without a login, the API route can
+        try:
+            src = _reddit_video_source(_reddit_post(url))
+            if src:
+                files = _ytdlp(src, outdir, "audio", None) if kind == "audio" else _video(src, outdir, opt)
+        except Exception as e:
+            log.info("reddit video fallback failed: %s", e)
     if not files and kind != "audio":
         try:
             files = download_images(url, outdir)
         except Exception as e:  # best-effort; report the yt-dlp error instead
             log.info("image fallback failed: %s", e)
     if not files and err:
+        if site_of(url) == "reddit" and not (REDDIT_ID and REDDIT_SECRET) and not COOKIES:
+            raise yt_dlp.utils.DownloadError("Reddit needs a login now. The bot owner has to add Reddit API keys or cookies (see INSTALL.md).")
         raise err
     return [to_jpg(f) if f.suffix.lower() in PHOTO_EXT else f for f in files]
 

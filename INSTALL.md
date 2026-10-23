@@ -1,6 +1,6 @@
 # Installing the bot
 
-Read the first three sections, then jump to your system: [Windows](#windows), [Mac](#mac), [Linux](#linux), [Raspberry Pi 4](#raspberry-pi-4), [Android](#android-termux) or [Docker](#docker). Instagram cookies, updating and troubleshooting come after.
+Read the first three sections, then jump to your system: [Windows](#windows), [Mac](#mac), [Linux](#linux), [Raspberry Pi 4](#raspberry-pi-4), [Android](#android-termux) or [Docker](#docker). Instagram cookies, Reddit access, updating and troubleshooting come after.
 
 Nothing here needs open ports or router changes. The bot only connects outward.
 
@@ -28,6 +28,8 @@ TELEGRAM_BOT_TOKEN=123456:ABC-DEF...     # from @BotFather
 ALLOWED_CHATS=-1001234567890             # the group ID from /id; only this group can use the bot
 ALLOWED_USERS=                           # your own user ID (send /id to the bot privately) if you want private chat too
 COOKIES_FILE=                            # path to your Instagram cookies.txt, see below
+REDDIT_CLIENT_ID=                        # free Reddit API key, see Reddit access below
+REDDIT_CLIENT_SECRET=
 HOST_NAME=                               # name that /host shows, defaults to the computer's name
 SHARED_HOSTING=                          # 1 only when several devices run the bot with one token
 ```
@@ -181,6 +183,17 @@ A few rules for the cookies file:
 - Every Instagram link sent to the group is fetched as that account. If the account follows private accounts, anyone in the group can download their posts, and Instagram sees the activity coming from the host's connection. Follow nobody private with it.
 - Run only the code from this repository. A modified copy could send your cookies somewhere else.
 
+## Reddit access
+
+Reddit now wants a login before it shows most posts, so a Reddit link can fail with "Account authentication is required". A free API key lets the bot fetch Reddit videos, images and galleries through Reddit's official API instead.
+
+1. Log in to reddit.com, open reddit.com/prefs/apps and click "create another app".
+2. Give it any name, choose "script", and enter `http://localhost:8080` as the redirect URI (it's never used).
+3. Click create. The client ID is the short string under the app's name, and the secret is labelled "secret".
+4. Put them in `.env` as `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET`, then restart the bot.
+
+Reddit has started reviewing new apps, so it may ask for approval or refuse. The other way in is cookies: export reddit.com the same way as Instagram above, then paste the new lines into the same `cookies.txt` underneath the existing ones (leave out the `# Netscape` header line). Use a spare Reddit account for this, and the same rules apply as for Instagram.
+
 ## Starting, stopping and updating
 
 yt-dlp keeps itself current. The bot runs `pip install -U yt-dlp` each time it starts and again every 24 hours. If a newer version arrived, it waits until no download is running, shuts down cleanly and starts itself again to load it. That restart doesn't depend on the service, `run.bat` or Docker. If the update fails (no internet, say), it logs a warning and carries on with the version it has. `AUTO_UPDATE_YTDLP=0` in `.env` turns this off, and `YTDLP_UPDATE_HOURS=12` changes the interval (`0` means only at start).
@@ -206,5 +219,6 @@ To update yt-dlp right away, run `pip install -U yt-dlp` from inside the folder 
 | `Conflict: terminated by other getUpdates request` | Another copy is running with the same token. Stop it, or set `SHARED_HOSTING=1` on all of them |
 | YouTube says "Sign in to confirm you're not a bot" | Force a yt-dlp update, wait a while, or add cookies from a YouTube login |
 | Instagram says "empty media response" | The cookies are missing, expired or from a logged-out session. Export new ones |
+| Reddit says "Account authentication is required" or "needs a login" | Add Reddit API keys or cookies, see [Reddit access](#reddit-access) |
 | A video is missing or low quality | Telegram limits bots to 50 MB, so very long videos only fit at 360p or lower |
 | The service won't start on Linux or Pi | `journalctl -u igxytdl -n 50` shows why. A wrong or empty token in `.env` is the usual cause |
