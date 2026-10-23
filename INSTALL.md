@@ -6,6 +6,7 @@ Step-by-step setup for **Windows**, **Linux** and the **Raspberry Pi 4 Model B (
 - [Windows 10 / 11](#windows-10--11)
 - [Linux (Ubuntu, Debian, Mint, Fedora, Arch)](#linux)
 - [Raspberry Pi 4 Model B, 4 GB](#raspberry-pi-4-model-b-4-gb)
+- [Running on more than one device: who is active?](#running-on-more-than-one-device-who-is-active)
 - [The settings file (.env)](#the-settings-file-env)
 - [Updating, stopping, uninstalling](#updating-stopping-uninstalling)
 - [Troubleshooting](#troubleshooting)
@@ -204,6 +205,19 @@ Wait two minutes, then send `/start` to the bot again. If it answers, the Pi is 
 - Heavy use writes temporary video files; a good card (or a USB SSD) lasts longer.
 - If downloads stop working, update yt-dlp first: see [Updating](#updating-stopping-uninstalling).
 - To use it on several devices at once, set `SHARED_HOSTING=1` and a different `HOST_NAME` on each ([HOSTING.md](HOSTING.md), section F).
+
+---
+
+## Running on more than one device: who is active?
+
+You can run the bot on several devices with the same token (set `SHARED_HOSTING=1` and a different `HOST_NAME` on each; see [HOSTING.md](HOSTING.md), section F). Only one of them answers at a time. Here is how they take turns:
+
+- **There is no priority.** Whichever device claims the bot first stays in charge until it stops, and the others wait as backups. No device is better than another, and the bot does not pick the faster one.
+- **One starts first:** it becomes the active host. The second one starts, sees the claim, and waits.
+- **Both start at the same moment:** each writes its claim, waits a few seconds, and checks who won. The last claim wins, which is essentially random.
+- **The active device stays active** even if the other one is faster or comes online later. It only hands over when the active one stops, crashes or loses internet, and then within about 90 seconds (or under half a minute after a clean shutdown).
+- **Resources are not shared.** Telegram lets only one program fetch the bot's messages at a time, so only one device handles links. The backup does nothing, so a second device adds reliability, not extra speed.
+- **Instagram:** only the active device uses its own cookies, so Instagram links work only while a device with working cookies is the active one. Send `/host` in the group to see which device is answering.
 
 ---
 
