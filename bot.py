@@ -16,7 +16,7 @@ import tempfile
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from dotenv import load_dotenv
 
@@ -448,6 +448,17 @@ def site_of(url: str) -> str | None:
     return next((n for n, (doms, _) in SITES.items() if any(host == d or host.endswith("." + d) for d in doms)), None)
 
 
+def clean_url(url: str) -> str:
+    """Drop share and tracking parameters (Instagram's igsh, YouTube's si, utm_ and the like) from a link.
+
+    They identify whoever shared the link, and the bot would otherwise send them to the site and repeat them in the
+    chat. Only the parts a download needs are kept."""
+    parts = urlparse(url)
+    keep = {"v", "list"} if site_of(url) == "youtube" else set()
+    query = urlencode([(k, v) for k, v in parse_qsl(parts.query) if k in keep])
+    return urlunparse(parts._replace(query=query, fragment=""))
+
+
 def _load() -> dict:
     try:
         return json.loads(SETTINGS_FILE.read_text())
@@ -580,7 +591,7 @@ async def handle(update: Update, ctx: ContextTypes.DEFAULT_TYPE, fmt: str | None
     if not allowed(update):
         return
     msg = update.effective_message
-    urls = [u for u in URL_RE.findall(msg.text or "") if SITE_RE.match(u)]
+    urls = [clean_url(u) for u in URL_RE.findall(msg.text or "") if SITE_RE.match(u)]
     if not urls:
         if fmt:  # /audio without a usable link; ordinary chatter gets no reply
             await msg.reply_text("Send a valid Instagram, YouTube, TikTok, Twitter/X or Reddit link.")
