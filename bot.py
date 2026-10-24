@@ -1,5 +1,7 @@
 """Telegram bot that downloads Instagram, YouTube, TikTok, Twitter/X and Reddit media via yt-dlp."""
 import asyncio
+import http.cookiejar
+import io
 import json
 import logging
 import os
@@ -190,6 +192,41 @@ def _reddit_images(url: str) -> list[str]:
     return [(m["s"].get("u") or m["s"].get("gif")) for m in meta.values() if m.get("s") and m.get("status") == "valid"]
 
 
+_IG_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+
+
+def _instagram_images(url: str) -> list[str]:
+    """Photos of an Instagram post, at full size. yt-dlp only does the videos.
+
+    Asks Instagram's own data endpoint, with the login cookies, which says for every item whether it's a photo or a
+    video and lists each photo's biggest uncropped version. Videos in a carousel are skipped here."""
+    m = re.search(r"/(?:p|reel|reels|tv)/([\w-]+)", urlparse(url).path)
+    if not m or not COOKIES:
+        return []
+    jar = http.cookiejar.MozillaCookieJar(COOKIES)
+    jar.load(ignore_discard=True, ignore_expires=True)
+    cookies = {c.name: c.value for c in jar if "instagram.com" in c.domain}
+    media_id = 0
+    for ch in m[1][:11]:  # the short code in the link is the post's number written in base 64
+        media_id = media_id * 64 + _IG_ALPHABET.index(ch)
+    r = httpx.get(
+        f"https://www.instagram.com/api/v1/media/{media_id}/info/",
+        headers={"User-Agent": UA, "X-IG-App-ID": "936619743392459", "X-Requested-With": "XMLHttpRequest",
+                 "X-CSRFToken": cookies.get("csrftoken", ""), "Referer": "https://www.instagram.com/"},
+        cookies=cookies, timeout=30,
+    )
+    r.raise_for_status()
+    item = r.json()["items"][0]
+    urls = []
+    for part in item.get("carousel_media") or [item]:
+        if part.get("video_versions"):
+            continue
+        candidates = (part.get("image_versions2") or {}).get("candidates") or []
+        if candidates:
+            urls.append(candidates[0]["url"])  # listed biggest first
+    return urls
+
+
 def image_urls(url: str) -> list[str]:
     parsed = urlparse(url)
     host = parsed.netloc.lower()
@@ -197,6 +234,8 @@ def image_urls(url: str) -> list[str]:
         return _twitter_images(parsed.path)
     if re.search(r"(reddit\.com|redd\.it)$", host):
         return _reddit_images(url)
+    if site_of(url) == "instagram":
+        return _instagram_images(url)
     return []
 
 
@@ -214,9 +253,20 @@ def to_jpg(path: Path) -> Path:
 def download_images(url: str, outdir: Path) -> list[Path]:
     files = []
     for i, src in enumerate(image_urls(url)[:10], 1):
-        ext = Path(urlparse(src).path).suffix.lower() or ".jpg"
-        f = outdir / f"{i:02d}_img{ext}"
-        f.write_bytes(_get(src).content)
+        data = _get(src).content
+        f = outdir / f"{i:02d}_img.jpg"
+        try:  # go by what the file really is, since the address often has the wrong ending
+            with Image.open(io.BytesIO(data)) as im:
+                if im.format == "GIF":
+                    f = f.with_suffix(".gif")
+                    f.write_bytes(data)
+                elif im.format == "JPEG":
+                    f.write_bytes(data)
+                else:
+                    im.convert("RGB").save(f, "JPEG", quality=95)
+        except Exception:
+            f = f.with_suffix(Path(urlparse(src).path).suffix.lower() or ".jpg")
+            f.write_bytes(data)
         files.append(to_jpg(f))
     return files
 
@@ -227,10 +277,10 @@ def _clear(outdir: Path) -> None:
             p.unlink()
 
 
-def _video(url: str, outdir: Path, height: int | None) -> list[Path]:
+def _video(url: str, outdir: Path, height: int | None, failed: list | None = None) -> list[Path]:
     """Highest quality first; if the file is over Telegram's limit, step down to the next quality that fits."""
     for h in LADDER[LADDER.index(height):]:
-        files = _ytdlp(url, outdir, "video", h)
+        files = _ytdlp(url, outdir, "video", h, failed)
         if files and all(f.stat().st_size <= MAX_BYTES for f in files if f.suffix.lower() in VIDEO_EXT):
             return files
         _clear(outdir)
@@ -250,8 +300,9 @@ def download(url: str, outdir: Path, fmt: str) -> list[Path]:
     _, kind, opt = FORMATS[fmt]
     err = None
     files: list[Path] = []
+    failed: list[str] = []
     try:
-        files = _ytdlp(url, outdir, "audio", None) if kind == "audio" else _video(url, outdir, opt)
+        files = _ytdlp(url, outdir, "audio", None) if kind == "audio" else _video(url, outdir, opt, failed)
     except yt_dlp.utils.DownloadError as e:
         err = e
     if not files and site_of(url) == "reddit":  # yt-dlp can't read Reddit pages without a login, the API route can
@@ -261,6 +312,11 @@ def download(url: str, outdir: Path, fmt: str) -> list[Path]:
                 files = _ytdlp(src, outdir, "audio", None) if kind == "audio" else _video(src, outdir, opt)
         except Exception as e:
             log.info("reddit video fallback failed: %s", e)
+    if kind != "audio" and site_of(url) == "instagram" and files and failed:  # carousel: videos done, now its photos
+        try:
+            files = sorted(files + download_images(url, outdir))
+        except Exception as e:
+            log.info("instagram photos failed: %s", e)
     if not files and kind != "audio":
         try:
             files = download_images(url, outdir)
@@ -285,7 +341,7 @@ class _YtLog:
     def error(self, msg): self.errors.append(msg)
 
 
-def _ytdlp(url: str, outdir: Path, kind: str, opt) -> list[Path]:
+def _ytdlp(url: str, outdir: Path, kind: str, opt, failed: list | None = None) -> list[Path]:
     lg = _YtLog()
     opts = {
         "outtmpl": str(outdir / "%(autonumber)02d_%(id)s.%(ext)s"),
@@ -312,6 +368,8 @@ def _ytdlp(url: str, outdir: Path, kind: str, opt) -> list[Path]:
     done = VIDEO_EXT | PHOTO_EXT | ANIM_EXT | AUDIO_EXT
     # skip leftovers of an aborted download (.part files, separate video/audio streams like .f140.m4a)
     files = sorted(p for p in outdir.iterdir() if p.is_file() and p.suffix.lower() in done and not re.search(r"\.f[\w-]+\.\w+$", p.name))
+    if failed is not None:
+        failed.extend(lg.errors)  # items yt-dlp couldn't do, such as the photos of a carousel
     if not files and lg.errors:
         raise yt_dlp.utils.DownloadError(lg.errors[-1])
     if lg.errors:
