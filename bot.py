@@ -277,22 +277,46 @@ def _clear(outdir: Path) -> None:
             p.unlink()
 
 
+def _fit_height(url: str) -> int | None:
+    """Tallest video that should fit Telegram's limit, worked out from the sizes YouTube lists.
+
+    Returns 0 when nothing of at least 240p fits (a very long video), and None when the sizes aren't known.
+    Saves downloading and throwing away one attempt per quality level."""
+    opts = {"quiet": True, "skip_download": True, "logger": _YtLog(), "noplaylist": True}
+    if COOKIES:
+        opts["cookiefile"] = COOKIES
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            formats = (ydl.extract_info(url, download=False) or {}).get("formats") or []
+        size = lambda f: f.get("filesize") or f.get("filesize_approx")
+        audio = [size(f) for f in formats if f.get("acodec") not in (None, "none") and f.get("vcodec") in (None, "none") and size(f)]
+        by_height: dict[int, int] = {}
+        for f in formats:
+            if f.get("vcodec") not in (None, "none") and f.get("acodec") in (None, "none") and size(f) and f.get("height"):
+                by_height[f["height"]] = min(by_height.get(f["height"], 10**13), size(f))
+        if not audio or not by_height:
+            return None
+        fitting = [h for h, v in by_height.items() if h >= 240 and (v + min(audio)) * 1.05 <= MAX_BYTES]
+        return max(fitting) if fitting else 0
+    except Exception:
+        return None
+
+
 def _video(url: str, outdir: Path, height: int | None, failed: list | None = None) -> list[Path]:
     """Highest quality first; if the file is over Telegram's limit, step down to the next quality that fits."""
+    if site_of(url) == "youtube":
+        fit = _fit_height(url)
+        if fit == 0:
+            return []  # too long to send as video; download() then sends the sound only
+        if fit:
+            top = max(h for h in LADDER[1:] if h <= fit)
+            height = top if height is None else min(height, top)
     for h in LADDER[LADDER.index(height):]:
         files = _ytdlp(url, outdir, "video", h, failed)
         if files and all(f.stat().st_size <= MAX_BYTES for f in files if f.suffix.lower() in VIDEO_EXT):
             return files
         _clear(outdir)
     return []
-
-
-def cookies_cover(domain: str) -> bool:
-    """True if the cookies file has a login for this site (a file with only Instagram cookies doesn't help Reddit)."""
-    try:
-        return domain in Path(COOKIES).read_text() if COOKIES else False
-    except OSError:
-        return False
 
 
 def download(url: str, outdir: Path, fmt: str) -> list[Path]:
@@ -322,6 +346,11 @@ def download(url: str, outdir: Path, fmt: str) -> list[Path]:
             files = download_images(url, outdir)
         except Exception as e:  # best-effort; report the yt-dlp error instead
             log.info("image fallback failed: %s", e)
+    if not files and not err and kind == "video":  # nothing fits as video (a very long one): send just the sound
+        try:
+            files = _ytdlp(url, outdir, "audio_small", None)
+        except Exception as e:
+            log.info("audio-only fallback failed: %s", e)
     if not files and err:
         if site_of(url) == "reddit" and not (REDDIT_ID and REDDIT_SECRET) and not cookies_cover("reddit.com"):
             raise yt_dlp.utils.DownloadError("Reddit needs a login now. The bot owner has to add Reddit API keys or cookies (see INSTALL.md).")
@@ -341,7 +370,20 @@ class _YtLog:
     def error(self, msg): self.errors.append(msg)
 
 
+ALT_CLIENTS = ["android_vr", "tv", "web_safari"]  # tried when YouTube asks the bot to prove it isn't one
+
+
 def _ytdlp(url: str, outdir: Path, kind: str, opt, failed: list | None = None) -> list[Path]:
+    try:
+        return _ytdlp_run(url, outdir, kind, opt, failed)
+    except yt_dlp.utils.DownloadError as e:
+        if site_of(url) == "youtube" and "Sign in to confirm" in str(e):  # a passing bot check; another route often gets through
+            _clear(outdir)
+            return _ytdlp_run(url, outdir, kind, opt, failed, clients=ALT_CLIENTS)
+        raise
+
+
+def _ytdlp_run(url: str, outdir: Path, kind: str, opt, failed: list | None = None, clients: list | None = None) -> list[Path]:
     lg = _YtLog()
     opts = {
         "outtmpl": str(outdir / "%(autonumber)02d_%(id)s.%(ext)s"),
@@ -354,7 +396,12 @@ def _ytdlp(url: str, outdir: Path, kind: str, opt, failed: list | None = None) -
     }
     if COOKIES:
         opts["cookiefile"] = COOKIES
-    if kind == "audio":
+    if clients:
+        opts["extractor_args"] = {"youtube": {"player_client": clients}}
+    if kind == "audio_small":  # the lowest-quality sound, for videos too long to send as video
+        opts["format"] = "worstaudio[ext=m4a]/worstaudio/worst"
+        opts["postprocessors"] = [{"key": "FFmpegExtractAudio", "preferredcodec": "m4a", "preferredquality": "48"}]
+    elif kind == "audio":
         opts["format"] = "bestaudio/best"
         opts["postprocessors"] = [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "0"}]
     else:
@@ -422,7 +469,7 @@ async def send_group(msg, files: list[Path]) -> None:
             h.close()
 
 
-async def send_file(msg, path: Path, as_document: bool = False, markup=None, caption=None):
+async def send_file(msg, path: Path, as_document: bool = False, markup=None, caption=None, audio_caption=None):
     ext = path.suffix.lower()
     if path.stat().st_size > MAX_BYTES:
         log.info("%s is over %s MB, not sent", path.name, MAX_MB)
@@ -438,7 +485,7 @@ async def send_file(msg, path: Path, as_document: bool = False, markup=None, cap
         elif ext in PHOTO_EXT:
             return await msg.reply_photo(f, read_timeout=120, write_timeout=120)
         elif ext in AUDIO_EXT:
-            return await msg.reply_audio(f, read_timeout=300, write_timeout=300)
+            return await msg.reply_audio(f, caption=audio_caption, read_timeout=300, write_timeout=300)
         else:
             return await msg.reply_document(f, read_timeout=300, write_timeout=300)
 
@@ -572,8 +619,10 @@ async def _run_download(ctx: ContextTypes.DEFAULT_TYPE, msg, url: str, fmt: str)
                 prompt = await msg.reply_text(f"Want the audio from these videos?\n{url}", reply_markup=mp3_button)
                 remember(ctx, prompt, url)
             files = [f for f in files if f not in album]
+        too_big = FORMATS[fmt][1] == "video" and all(f.suffix.lower() in AUDIO_EXT for f in files)
+        note = "Audio only: the video is too big for Telegram." if too_big else None
         for f in files:
-            sent = await send_file(msg, f, markup=mp3_button, caption=url)
+            sent = await send_file(msg, f, markup=mp3_button, caption=url, audio_caption=note)
             if sent and f.suffix.lower() in VIDEO_EXT:  # lets the MP3 button on a video find its source link
                 remember(ctx, sent, url)
         await status.delete()
