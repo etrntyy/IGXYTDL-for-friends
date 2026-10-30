@@ -67,6 +67,7 @@ if _cookies_src and Path(_cookies_src).is_file():  # yt-dlp rewrites its cookie 
     os.chmod(COOKIES, 0o600)  # the copy holds a login session; keep it readable by this user only
 ALLOWED = {int(x) for x in os.getenv("ALLOWED_USERS", "").split(",") if x.strip()}
 ALLOWED_CHATS = {int(x) for x in os.getenv("ALLOWED_CHATS", "").split(",") if x.strip()}  # group/chat IDs (groups are negative)
+MP3_LIMIT = int(os.getenv("MP3_LIMIT", "2"))  # times the same link's MP3 is sent to one chat
 UPDATE_HOURS = float(os.getenv("YTDLP_UPDATE_HOURS", "24"))  # 0 = only update at start
 RESTART = {"now": False, "downloads": 0}  # downloads in progress; restart waits until it is 0
 HOST_NAME = os.getenv("HOST_NAME") or socket.gethostname()  # shown by /host
@@ -373,6 +374,21 @@ class _YtLog:
 ALT_CLIENTS = ["android_vr", "tv", "web_safari"]  # tried when YouTube asks the bot to prove it isn't one
 
 
+META: dict[str, dict] = {}  # video id -> title and uploader, so files can be sent under their real names
+
+
+def display_info(path: Path) -> dict:
+    """Title for a downloaded file, from its id in the file name ("01_<id>.mp4")."""
+    found = re.match(r"^\d+_(.+)\.\w+$", path.name)
+    return META.get(found[1], {}) if found else {}
+
+
+def nice_name(title: str, ext: str) -> str:
+    cleaned = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', " ", title)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" .")[:100]
+    return (cleaned or "video") + ext
+
+
 def _ytdlp(url: str, outdir: Path, kind: str, opt, failed: list | None = None) -> list[Path]:
     try:
         return _ytdlp_run(url, outdir, kind, opt, failed)
@@ -411,7 +427,12 @@ def _ytdlp_run(url: str, outdir: Path, kind: str, opt, failed: list | None = Non
         opts["merge_output_format"] = "mp4"
         opts["postprocessors"] = [{"key": "FFmpegVideoRemuxer", "preferedformat": "mp4"}]
     with yt_dlp.YoutubeDL(opts) as ydl:
-        ydl.download([url])
+        info = ydl.extract_info(url, download=True) or {}
+    for entry in info.get("entries") or [info]:
+        if entry and entry.get("id") and entry.get("title"):
+            META[str(entry["id"])] = {"title": entry["title"], "uploader": entry.get("uploader") or entry.get("channel") or ""}
+            while len(META) > 300:
+                META.pop(next(iter(META)))
     done = VIDEO_EXT | PHOTO_EXT | ANIM_EXT | AUDIO_EXT
     # skip leftovers of an aborted download (.part files, separate video/audio streams like .f140.m4a)
     files = sorted(p for p in outdir.iterdir() if p.is_file() and p.suffix.lower() in done and not re.search(r"\.f[\w-]+\.\w+$", p.name))
@@ -474,20 +495,24 @@ async def send_file(msg, path: Path, as_document: bool = False, markup=None, cap
     if path.stat().st_size > MAX_BYTES:
         log.info("%s is over %s MB, not sent", path.name, MAX_MB)
         return None
+    info = display_info(path)
+    title = info.get("title")
+    name = {"filename": nice_name(title, ext)} if title else {}  # shown in the chat and used when the file is saved
     with path.open("rb") as f:
         if as_document:
-            return await msg.reply_document(f, read_timeout=300, write_timeout=300)
+            return await msg.reply_document(f, read_timeout=300, write_timeout=300, **name)
         elif ext in VIDEO_EXT:
             shape = await asyncio.to_thread(video_shape, path)
-            return await msg.reply_video(f, supports_streaming=True, reply_markup=markup, caption=caption, read_timeout=300, write_timeout=300, **shape)
+            return await msg.reply_video(f, supports_streaming=True, reply_markup=markup, caption=caption, read_timeout=300, write_timeout=300, **shape, **name)
         elif ext in ANIM_EXT:
             return await msg.reply_animation(f, read_timeout=300, write_timeout=300)
         elif ext in PHOTO_EXT:
             return await msg.reply_photo(f, read_timeout=120, write_timeout=120)
         elif ext in AUDIO_EXT:
-            return await msg.reply_audio(f, caption=audio_caption, read_timeout=300, write_timeout=300)
+            tags = {"title": title[:200], "performer": (info.get("uploader") or "")[:200]} if title else {}
+            return await msg.reply_audio(f, caption=audio_caption, read_timeout=300, write_timeout=300, **tags, **name)
         else:
-            return await msg.reply_document(f, read_timeout=300, write_timeout=300)
+            return await msg.reply_document(f, read_timeout=300, write_timeout=300, **name)
 
 
 def site_of(url: str) -> str | None:
@@ -525,6 +550,29 @@ def set_auto(chat_id: int, sites: list[str], on: bool) -> None:
     chat = data.setdefault(str(chat_id), {}).setdefault("sites", {})
     for site in sites:
         chat[site] = on
+    SETTINGS_FILE.write_text(json.dumps(data))
+
+
+def media_key(url: str) -> str:
+    """One name for a piece of media, whichever form of its link was sent."""
+    parts = urlparse(url)
+    if site_of(url) == "youtube":
+        found = re.search(r"(?:youtu\.be/|/shorts/|/embed/|/live/)([\w-]{6,})", url) or re.search(r"[?&]v=([\w-]{6,})", url)
+        if found:
+            return "youtube:" + found[1]
+    return (parts.netloc.lower().removeprefix("www.") + parts.path.rstrip("/")).lower()
+
+
+def mp3_sent(chat_id: int, key: str) -> int:
+    return _load().get(str(chat_id), {}).get("mp3", {}).get(key, 0)
+
+
+def count_mp3(chat_id: int, key: str) -> None:
+    data = _load()
+    counts = data.setdefault(str(chat_id), {}).setdefault("mp3", {})
+    counts[key] = counts.get(key, 0) + 1
+    while len(counts) > 500:  # forget the oldest links
+        counts.pop(next(iter(counts)))
     SETTINGS_FILE.write_text(json.dumps(data))
 
 
@@ -582,12 +630,22 @@ def remember(ctx: ContextTypes.DEFAULT_TYPE, msg, url: str) -> None:
         pending.pop(next(iter(pending)))
 
 
-async def run_download(ctx: ContextTypes.DEFAULT_TYPE, msg, url: str, fmt: str) -> None:
+async def run_download(ctx: ContextTypes.DEFAULT_TYPE, msg, url: str, fmt: str, who: str = "") -> None:
+    key = media_key(url)
+    kind = FORMATS[fmt][1]
+    if kind == "audio" and mp3_sent(msg.chat_id, key) >= MP3_LIMIT:  # the same MP3 is only sent so many times per chat
+        log.info("not sending %s again to chat %s (limit %s), asked by %s", key, msg.chat_id, MP3_LIMIT, who)
+        return
+    busy = ctx.bot_data.setdefault("busy", set())
+    if (msg.chat_id, key, fmt) in busy:  # the same request is already running: repeated taps do nothing
+        return
+    busy.add((msg.chat_id, key, fmt))
     RESTART["downloads"] += 1
     try:
-        await _run_download(ctx, msg, url, fmt)
+        await _run_download(ctx, msg, url, fmt, who)
     finally:
         RESTART["downloads"] -= 1
+        busy.discard((msg.chat_id, key, fmt))
 
 
 async def _drop(status) -> None:
@@ -598,7 +656,7 @@ async def _drop(status) -> None:
         pass
 
 
-async def _run_download(ctx: ContextTypes.DEFAULT_TYPE, msg, url: str, fmt: str) -> None:
+async def _run_download(ctx: ContextTypes.DEFAULT_TYPE, msg, url: str, fmt: str, who: str = "") -> None:
     status = await msg.reply_text("Downloading…")
     tmp = Path(tempfile.mkdtemp(prefix="dlbot_"))
     try:
@@ -621,10 +679,16 @@ async def _run_download(ctx: ContextTypes.DEFAULT_TYPE, msg, url: str, fmt: str)
             files = [f for f in files if f not in album]
         too_big = FORMATS[fmt][1] == "video" and all(f.suffix.lower() in AUDIO_EXT for f in files)
         note = "Audio only: the video is too big for Telegram." if too_big else None
+        delivered = False
         for f in files:
             sent = await send_file(msg, f, markup=mp3_button, caption=url, audio_caption=note)
+            delivered = delivered or bool(sent)
             if sent and f.suffix.lower() in VIDEO_EXT:  # lets the MP3 button on a video find its source link
                 remember(ctx, sent, url)
+        if delivered:
+            log.info("sent %s (%s) to chat %s, asked by %s", media_key(url), fmt, msg.chat_id, who)
+            if FORMATS[fmt][1] == "audio":
+                count_mp3(msg.chat_id, media_key(url))
         await status.delete()
     except yt_dlp.utils.DownloadError as e:  # failures stay silent in the chat; the reason goes to the log
         log.warning("download failed: %s", re.sub(r"\x1b\[[0-9;]*m", "", str(e)).splitlines()[-1][:300])
@@ -647,7 +711,7 @@ async def handle(update: Update, ctx: ContextTypes.DEFAULT_TYPE, fmt: str | None
         return
     for url in urls[:3]:
         if fmt or auto_enabled(update.effective_chat.id, site_of(url)):
-            await run_download(ctx, msg, url, fmt or "best")
+            await run_download(ctx, msg, url, fmt or "best", f"user {update.effective_user.id if update.effective_user else '?'}")
             continue
         keyboard = InlineKeyboardMarkup(
             [[InlineKeyboardButton(FORMATS[k][0], callback_data=f"f|{k}") for k in row] for row in MENU_ROWS]
@@ -673,7 +737,7 @@ async def on_format(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await q.answer("This menu expired, send the link again.", show_alert=True)
         return
     await q.answer(f"{FORMATS[key][0]}…")
-    await run_download(ctx, q.message, url, key)
+    await run_download(ctx, q.message, url, key, f"user {q.from_user.id} (button)")
 
 
 async def ytdlp_update_loop() -> None:
