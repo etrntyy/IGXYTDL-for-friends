@@ -28,6 +28,7 @@ HOST_NAME=                               # name that /host shows, defaults to th
 SHARED_HOSTING=                          # 1 only when several devices run the bot with one token
 TELEGRAM_API_BASE=                       # address of a local Bot API server, only for files over 50 MB, see below
 MP3_LIMIT=2                              # how many times one link's MP3 is sent to the same chat
+CATCHUP_HOURS=24                         # how long unfinished links are retried, 0 turns catching up off
 ```
 
 Write the lines with no spaces around `=` and no quotes. If `ALLOWED_CHATS` and `ALLOWED_USERS` are both empty, anyone who finds the bot can use it. Restart the bot after any change; the command for each system is in [Starting, stopping and updating](#starting-stopping-and-updating).

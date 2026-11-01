@@ -14,6 +14,7 @@ import sys
 import time
 import tempfile
 import threading
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
@@ -47,7 +48,7 @@ if AUTO_UPDATE:  # at every start, before yt-dlp is imported, so the fresh versi
 import httpx
 import yt_dlp
 from PIL import Image
-from telegram import BotCommand, InlineKeyboardButton, InputMediaPhoto, InputMediaVideo, InlineKeyboardMarkup, Update
+from telegram import BotCommand, Chat, Message, InlineKeyboardButton, InputMediaPhoto, InputMediaVideo, InlineKeyboardMarkup, Update
 from telegram.constants import ChatAction
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
 
@@ -67,8 +68,11 @@ if _cookies_src and Path(_cookies_src).is_file():  # yt-dlp rewrites its cookie 
     os.chmod(COOKIES, 0o600)  # the copy holds a login session; keep it readable by this user only
 ALLOWED = {int(x) for x in os.getenv("ALLOWED_USERS", "").split(",") if x.strip()}
 ALLOWED_CHATS = {int(x) for x in os.getenv("ALLOWED_CHATS", "").split(",") if x.strip()}  # group/chat IDs (groups are negative)
+CATCHUP_HOURS = float(os.getenv("CATCHUP_HOURS", "24"))  # how far back unfinished links are retried; 0 turns it off
+CATCHUP_TRIES = int(os.getenv("CATCHUP_TRIES", "3"))  # attempts per link, the first one included
 MP3_LIMIT = int(os.getenv("MP3_LIMIT", "2"))  # times the same link's MP3 is sent to one chat
 UPDATE_HOURS = float(os.getenv("YTDLP_UPDATE_HOURS", "24"))  # 0 = only update at start
+RETRY_GAP = 300  # seconds between attempts at the same link
 RESTART = {"now": False, "downloads": 0}  # downloads in progress; restart waits until it is 0
 HOST_NAME = os.getenv("HOST_NAME") or socket.gethostname()  # shown by /host
 SHARED_HOSTING = os.getenv("SHARED_HOSTING") == "1"  # several devices share one token, one active at a time
@@ -576,6 +580,66 @@ def count_mp3(chat_id: int, key: str) -> None:
     SETTINGS_FILE.write_text(json.dumps(data))
 
 
+PENDING_FILE = SETTINGS_FILE.with_name("pending.json")  # per device: links this device started but has not delivered yet
+
+
+def _pending() -> dict:
+    try:
+        return json.loads(PENDING_FILE.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def _pending_save(data: dict) -> None:
+    tmp = PENDING_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data))
+    tmp.replace(PENDING_FILE)
+
+
+def pending_start(chat_id: int, msg_id: int, url: str) -> None:
+    """Note that this link is being worked on, so a shutdown or a failure mid-way doesn't lose it."""
+    if CATCHUP_HOURS <= 0:
+        return
+    data = _pending()
+    item = data.setdefault(f"{chat_id}:{msg_id}", {"chat": chat_id, "msg": msg_id, "ts": time.time(), "urls": {}})
+    entry = item["urls"].setdefault(url, {"tries": 0})
+    entry["tries"] += 1
+    entry["last"] = time.time()
+    _pending_save(data)
+
+
+def pending_done(chat_id: int, msg_id: int, url: str) -> None:
+    data = _pending()
+    item = data.get(f"{chat_id}:{msg_id}")
+    if item:
+        item["urls"].pop(url, None)
+        if not item["urls"]:
+            data.pop(f"{chat_id}:{msg_id}")
+        _pending_save(data)
+
+
+def pending_due(skip: set) -> list[tuple[int, int, str]]:
+    """Links that were started but never delivered, old enough to try again and not out of attempts."""
+    data, now, due, changed = _pending(), time.time(), [], False
+    for key, item in list(data.items()):
+        if now - item["ts"] > CATCHUP_HOURS * 3600:
+            data.pop(key)
+            changed = True
+            continue
+        for url, entry in list(item["urls"].items()):
+            if entry["tries"] >= CATCHUP_TRIES:
+                item["urls"].pop(url)
+                changed = True
+            elif (item["chat"], item["msg"], url) not in skip and now - entry["last"] >= RETRY_GAP:
+                due.append((item["chat"], item["msg"], url))
+        if not item["urls"]:
+            data.pop(key)
+            changed = True
+    if changed:
+        _pending_save(data)
+    return due
+
+
 def auto_status(chat_id: int) -> str:
     return "\n".join(f"{'✅' if auto_enabled(chat_id, n) else '⛔'} {n}" for n in SITES)
 
@@ -630,19 +694,20 @@ def remember(ctx: ContextTypes.DEFAULT_TYPE, msg, url: str) -> None:
         pending.pop(next(iter(pending)))
 
 
-async def run_download(ctx: ContextTypes.DEFAULT_TYPE, msg, url: str, fmt: str, who: str = "") -> None:
+async def run_download(ctx: ContextTypes.DEFAULT_TYPE, msg, url: str, fmt: str, who: str = "") -> bool:
+    """True when something was sent (or there was nothing to do); False when the download failed."""
     key = media_key(url)
     kind = FORMATS[fmt][1]
     if kind == "audio" and mp3_sent(msg.chat_id, key) >= MP3_LIMIT:  # the same MP3 is only sent so many times per chat
         log.info("not sending %s again to chat %s (limit %s), asked by %s", key, msg.chat_id, MP3_LIMIT, who)
-        return
+        return True
     busy = ctx.bot_data.setdefault("busy", set())
     if (msg.chat_id, key, fmt) in busy:  # the same request is already running: repeated taps do nothing
-        return
+        return True
     busy.add((msg.chat_id, key, fmt))
     RESTART["downloads"] += 1
     try:
-        await _run_download(ctx, msg, url, fmt, who)
+        return await _run_download(ctx, msg, url, fmt, who)
     finally:
         RESTART["downloads"] -= 1
         busy.discard((msg.chat_id, key, fmt))
@@ -656,7 +721,7 @@ async def _drop(status) -> None:
         pass
 
 
-async def _run_download(ctx: ContextTypes.DEFAULT_TYPE, msg, url: str, fmt: str, who: str = "") -> None:
+async def _run_download(ctx: ContextTypes.DEFAULT_TYPE, msg, url: str, fmt: str, who: str = "") -> bool:
     status = await msg.reply_text("Downloading…")
     tmp = Path(tempfile.mkdtemp(prefix="dlbot_"))
     try:
@@ -665,7 +730,7 @@ async def _run_download(ctx: ContextTypes.DEFAULT_TYPE, msg, url: str, fmt: str,
         if not files:
             log.info("nothing downloaded for %s", url)
             await _drop(status)
-            return
+            return False
         await status.edit_text("Uploading…")
         mp3_button = InlineKeyboardMarkup([[InlineKeyboardButton("🎵 Get MP3 of this", callback_data="f|mp3")]])
         album = [f for f in files if f.suffix.lower() in VIDEO_EXT | PHOTO_EXT and f.stat().st_size <= MAX_BYTES]
@@ -690,12 +755,15 @@ async def _run_download(ctx: ContextTypes.DEFAULT_TYPE, msg, url: str, fmt: str,
             if FORMATS[fmt][1] == "audio":
                 count_mp3(msg.chat_id, media_key(url))
         await status.delete()
+        return delivered
     except yt_dlp.utils.DownloadError as e:  # failures stay silent in the chat; the reason goes to the log
         log.warning("download failed: %s", re.sub(r"\x1b\[[0-9;]*m", "", str(e)).splitlines()[-1][:300])
         await _drop(status)
+        return False
     except Exception:
         log.exception("unexpected error")
         await _drop(status)
+        return False
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -711,7 +779,17 @@ async def handle(update: Update, ctx: ContextTypes.DEFAULT_TYPE, fmt: str | None
         return
     for url in urls[:3]:
         if fmt or auto_enabled(update.effective_chat.id, site_of(url)):
-            await run_download(ctx, msg, url, fmt or "best", f"user {update.effective_user.id if update.effective_user else '?'}")
+            who = f"user {update.effective_user.id if update.effective_user else '?'}"
+            if fmt:
+                await run_download(ctx, msg, url, fmt, who)
+                continue
+            pending_start(msg.chat_id, msg.message_id, url)
+            ctx.bot_data.setdefault("live", set()).add((msg.chat_id, msg.message_id, url))
+            try:
+                if await run_download(ctx, msg, url, "best", who):
+                    pending_done(msg.chat_id, msg.message_id, url)
+            finally:
+                ctx.bot_data["live"].discard((msg.chat_id, msg.message_id, url))
             continue
         keyboard = InlineKeyboardMarkup(
             [[InlineKeyboardButton(FORMATS[k][0], callback_data=f"f|{k}") for k in row] for row in MENU_ROWS]
@@ -738,6 +816,29 @@ async def on_format(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     await q.answer(f"{FORMATS[key][0]}…")
     await run_download(ctx, q.message, url, key, f"user {q.from_user.id} (button)")
+
+
+async def catchup_loop(app: Application) -> None:
+    """Links that were interrupted (laptop shut, no internet) or failed get tried again, from the newest on."""
+    await asyncio.sleep(20)  # let the messages Telegram kept while the bot was off arrive first
+    while CATCHUP_HOURS > 0:
+        try:
+            if app.updater and app.updater.running:  # with shared hosting only the active device retries
+                live = app.bot_data.setdefault("live", set())
+                for chat_id, msg_id, url in reversed(pending_due(live)):
+                    live.add((chat_id, msg_id, url))
+                    pending_start(chat_id, msg_id, url)
+                    msg = Message(message_id=msg_id, date=datetime.now(timezone.utc), chat=Chat(id=chat_id, type="group"))
+                    msg.set_bot(app.bot)
+                    log.info("trying %s again (chat %s)", media_key(url), chat_id)
+                    try:
+                        if await run_download(app, msg, url, "best", "catch-up"):
+                            pending_done(chat_id, msg_id, url)
+                    finally:
+                        live.discard((chat_id, msg_id, url))
+        except Exception:
+            log.exception("catch-up round failed")
+        await asyncio.sleep(120)
 
 
 async def ytdlp_update_loop() -> None:
@@ -790,6 +891,7 @@ def main() -> None:
     if API_BASE:
         builder = builder.base_url(f"{API_BASE}/bot").base_file_url(f"{API_BASE}/file/bot").local_mode(True)
     async def post_init(a: Application) -> None:
+        a.bot_data["catchup_task"] = asyncio.create_task(catchup_loop(a))
         if AUTO_UPDATE:
             a.bot_data["ytdlp_task"] = asyncio.create_task(ytdlp_update_loop())
         await a.bot.set_my_commands([
