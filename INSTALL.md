@@ -137,7 +137,7 @@ After the first boot:
    ./scripts/termux-setup.sh
    ```
 3. Run `nano .env`, paste your token and the other settings, save with Ctrl+O and Enter, and leave with Ctrl+X.
-4. Start the bot with the same keep-alive script as on Linux, `./scripts/run-forever.sh`.
+4. Run `termux-wake-lock` so the phone keeps the CPU awake when the screen turns off, then start the bot with the same keep-alive script as on Linux, `./scripts/run-forever.sh`. Termux's notification shows "wake lock held" while it is on. You have to run it again after closing Termux; the reboot start in step 6 does it for you.
 5. So Android doesn't kill it, open Settings, Apps, Termux, Battery and set it to Unrestricted (the wording differs by brand), keep Termux's notification showing, and leave the phone plugged in and on Wi-Fi.
 6. Open the Termux:Boot app once. After that the bot starts by itself when the phone reboots.
 
