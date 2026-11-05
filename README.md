@@ -15,7 +15,7 @@ A Telegram bot for a group chat. Drop an Instagram, YouTube, TikTok, X (Twitter)
 - Links posted while the bot was off are downloaded when it comes back. Telegram keeps messages for a bot for 24 hours, so a bot that was off longer than that misses the older ones; the bot can't read a chat's earlier history. A download that was cut off (laptop shut, connection lost) or failed is retried up to 3 times over the next 24 hours.
 - If a link can't be downloaded, the bot stays quiet instead of posting an error. The reason is written to the log.
 - Share and tracking parts of a link (Instagram's `igsh`, YouTube's `si`, `utm_` and similar) are removed before the bot uses the link, so they aren't sent to the site or repeated in the chat.
-- yt-dlp updates itself every day, so YouTube and Instagram changes get picked up without you doing anything.
+- yt-dlp updates itself every day, so YouTube and Instagram changes get picked up without you doing anything. The bot's own code does the same from this repository every 6 hours, which is why everyone sharing a bot ends up on the same version (`AUTO_UPDATE_CODE=0` turns that off).
 
 ## Commands
 

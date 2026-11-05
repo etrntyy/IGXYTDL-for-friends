@@ -257,6 +257,8 @@ To undo it, remove the `TELEGRAM_API_BASE` line. The bot then has to be logged o
 
 yt-dlp keeps itself current. The bot runs `pip install -U yt-dlp` each time it starts and again every 24 hours. If a newer version arrived, it waits until no download is running, shuts down cleanly and starts itself again to load it. That restart doesn't depend on the service, `run.bat` or Docker. If the update fails (no internet, say), it logs a warning and carries on with the version it has. `AUTO_UPDATE_YTDLP=0` in `.env` turns this off, and `YTDLP_UPDATE_HOURS=12` changes the interval (`0` means only at start).
 
+The bot's own code updates the same way. Every 6 hours (`CODE_UPDATE_HOURS`) it compares `bot.py`, `hosting.py` and `requirements.txt` with the copies on GitHub. If they differ, it checks that the new files load, keeps the old ones in a `.previous` folder, swaps them in and restarts itself once no download is running. A check that fails (no internet, a broken upload) leaves the current version alone. Whoever controls the GitHub repository controls the code your device runs, so if you would rather review changes yourself, set `AUTO_UPDATE_CODE=0` in `.env`. If you keep your own fork, set `CODE_REPO=yourname/yourrepo`. Docker only updates inside the running container; rebuild the image to make it permanent.
+
 Everyday jobs:
 
 | | Windows | Mac | Linux and Pi |

@@ -6,3 +6,4 @@ settings.json
 data/
 .DS_Store
 pending.json
+.previous/

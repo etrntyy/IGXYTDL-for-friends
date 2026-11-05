@@ -71,6 +71,11 @@ ALLOWED_CHATS = {int(x) for x in os.getenv("ALLOWED_CHATS", "").split(",") if x.
 CATCHUP_HOURS = float(os.getenv("CATCHUP_HOURS", "24"))  # how far back unfinished links are retried; 0 turns it off
 CATCHUP_TRIES = int(os.getenv("CATCHUP_TRIES", "3"))  # attempts per link, the first one included
 MP3_LIMIT = int(os.getenv("MP3_LIMIT", "2"))  # times the same link's MP3 is sent to one chat
+CODE_UPDATE = os.getenv("AUTO_UPDATE_CODE", "1") != "0"  # fetch new versions of the bot itself from GitHub
+CODE_REPO = os.getenv("CODE_REPO", "etrntyy/IGXYTDL-for-friends")
+CODE_BRANCH = os.getenv("CODE_BRANCH", "main")
+CODE_UPDATE_HOURS = float(os.getenv("CODE_UPDATE_HOURS", "6"))
+CODE_FILES = ["bot.py", "hosting.py", "requirements.txt"]
 UPDATE_HOURS = float(os.getenv("YTDLP_UPDATE_HOURS", "24"))  # 0 = only update at start
 RETRY_GAP = 300  # seconds between attempts at the same link
 RESTART = {"now": False, "downloads": 0}  # downloads in progress; restart waits until it is 0
@@ -878,6 +883,67 @@ async def catchup_loop(app: Application) -> None:
         await asyncio.sleep(120)
 
 
+def update_code() -> bool:
+    """Replace the bot's own files with the ones on GitHub; True if something changed.
+
+    The new files are tried out first (they must import cleanly) and the old ones are kept in .previous/, so a bad
+    upload on GitHub can't take the bot down or leave it without a way back."""
+    here = Path(__file__).resolve().parent
+    base = f"https://raw.githubusercontent.com/{CODE_REPO}/{CODE_BRANCH}"
+    new, changed = {}, []
+    for name in CODE_FILES:
+        r = httpx.get(f"{base}/{name}", headers={"User-Agent": UA, "Cache-Control": "no-cache"}, timeout=30)
+        r.raise_for_status()
+        new[name] = r.content
+        if not (here / name).is_file() or (here / name).read_bytes() != r.content:
+            changed.append(name)
+    if not changed:
+        return False
+    if len(new["bot.py"]) < 5000 or b"def main" not in new["bot.py"]:
+        raise RuntimeError("the downloaded bot.py looks wrong, keeping the current one")
+    with tempfile.TemporaryDirectory(prefix="dlbot_new_") as tmp:
+        for name, data in new.items():
+            (Path(tmp) / name).write_bytes(data)
+        check = subprocess.run(
+            [sys.executable, "-c", "import bot, hosting"], cwd=tmp, capture_output=True, text=True, timeout=120,
+            env={**os.environ, "COOKIES_FILE": ""},  # the check must not touch the real cookie copy
+        )
+        if check.returncode:
+            raise RuntimeError("the new version doesn't load, keeping the current one: " + check.stderr.strip().splitlines()[-1])
+    (here / ".previous").mkdir(exist_ok=True)
+    for name in changed:
+        if (here / name).is_file():
+            shutil.copyfile(here / name, here / ".previous" / name)
+        tmp_file = here / (name + ".new")
+        tmp_file.write_bytes(new[name])
+        tmp_file.replace(here / name)
+    if "requirements.txt" in changed:
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-q", "--disable-pip-version-check", "-r", str(here / "requirements.txt")],
+            capture_output=True, timeout=600,
+        )
+    log.info("bot code updated from GitHub: %s", ", ".join(changed))
+    return True
+
+
+async def code_update_loop() -> None:
+    """Every CODE_UPDATE_HOURS: pick up new bot code from GitHub and restart (when idle) to run it."""
+    await asyncio.sleep(600)  # not right at start, so a restart never gets stuck in an update loop
+    while CODE_UPDATE_HOURS > 0:
+        try:
+            updated = await asyncio.to_thread(update_code)
+        except Exception as e:
+            log.warning("code update skipped: %s", e)
+            updated = False
+        if updated:
+            while RESTART["downloads"]:
+                await asyncio.sleep(30)
+            RESTART["now"] = True
+            signal.raise_signal(signal.SIGINT)
+            return
+        await asyncio.sleep(CODE_UPDATE_HOURS * 3600)
+
+
 async def ytdlp_update_loop() -> None:
     """Every UPDATE_HOURS: upgrade yt-dlp and, if it changed, restart the bot (when idle) so the new version loads."""
     while UPDATE_HOURS > 0:
@@ -929,6 +995,8 @@ def main() -> None:
         builder = builder.base_url(f"{API_BASE}/bot").base_file_url(f"{API_BASE}/file/bot").local_mode(True)
     async def post_init(a: Application) -> None:
         a.bot_data["catchup_task"] = asyncio.create_task(catchup_loop(a))
+        if CODE_UPDATE:
+            a.bot_data["code_task"] = asyncio.create_task(code_update_loop())
         if AUTO_UPDATE:
             a.bot_data["ytdlp_task"] = asyncio.create_task(ytdlp_update_loop())
         await a.bot.set_my_commands([
