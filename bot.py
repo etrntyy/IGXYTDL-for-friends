@@ -138,6 +138,23 @@ def _twitter_images(path: str) -> list[str]:
 _reddit_token: dict = {"value": None, "exp": 0.0}
 
 
+def _get_patient(url: str, **kw) -> httpx.Response:
+    """_get, but when Reddit says "too many requests" wait out the pause it announces (at most 3 minutes) and ask once more."""
+    try:
+        return _get(url, **kw)
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code != 429:
+            raise
+        try:
+            pause = float(e.response.headers.get("x-ratelimit-reset") or e.response.headers.get("retry-after") or 60)
+        except ValueError:
+            pause = 60
+        wait = min(pause, 180) + 2
+        log.info("Reddit asked us to slow down; waiting %.0f s", wait)
+        time.sleep(wait)
+        return _get(url, **kw)
+
+
 def cookies_cover(domain: str) -> bool:
     """True if the cookies file has a login for this site (a file with only Instagram cookies doesn't help Reddit)."""
     try:
@@ -178,7 +195,7 @@ def _reddit_json(path: str) -> list:
         )
         r.raise_for_status()
         return r.json()
-    r = _get(f"https://old.reddit.com{path}.json?raw_json=1", cookies=_site_cookies("reddit.com"))
+    r = _get_patient(f"https://old.reddit.com{path}.json?raw_json=1", cookies=_site_cookies("reddit.com"))
     if "json" not in r.headers.get("content-type", ""):
         raise RuntimeError("Reddit blocked access; add Reddit API keys or fresh Reddit cookies")
     return r.json()
