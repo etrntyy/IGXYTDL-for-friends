@@ -50,6 +50,7 @@ import yt_dlp
 from PIL import Image
 from telegram import BotCommand, Chat, Message, InlineKeyboardButton, InputMediaPhoto, InputMediaVideo, InlineKeyboardMarkup, Update
 from telegram.constants import ChatAction
+from telegram.error import BadRequest
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
 
 if not shutil.which("ffmpeg"):  # no system ffmpeg (e.g. no Homebrew): use the pip-bundled static build
@@ -366,6 +367,50 @@ def _video(url: str, outdir: Path, height: int | None, failed: list | None = Non
     return []
 
 
+SHRINK_MIN_KBPS = 300  # below this much video bitrate a re-encoded video is not worth sending
+
+
+def _shrink(src: Path) -> bool:
+    """Re-encode src in place so it fits Telegram's limit; False if it can't be made to fit decently."""
+    try:
+        length = float(subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(src)],
+            capture_output=True, text=True, timeout=30, check=True,
+        ).stdout.strip())
+    except Exception:
+        return False
+    audio_k = 96
+    for share in (0.92, 0.80):  # a second, lower try if the first result lands a little over the limit
+        video_k = int(MAX_BYTES * share * 8 / 1000 / length) - audio_k
+        if video_k < SHRINK_MIN_KBPS:
+            return False
+        height = 720 if video_k >= 1500 else 480 if video_k >= 700 else 360
+        out = src.with_name(src.stem + ".fit.mp4")
+        cmd = ["ffmpeg", "-y", "-v", "error", "-i", str(src), "-vf", f"scale=-2:'min({height},ih)'",
+               "-c:v", "libx264", "-preset", "veryfast", "-b:v", f"{video_k}k", "-maxrate", f"{int(video_k * 1.3)}k",
+               "-bufsize", f"{video_k * 2}k", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", f"{audio_k}k",
+               "-movflags", "+faststart", str(out)]
+        if subprocess.run(cmd, capture_output=True, timeout=1800).returncode:
+            out.unlink(missing_ok=True)
+            return False
+        if out.stat().st_size <= MAX_BYTES:
+            src.unlink()
+            out.rename(src)
+            return True
+        out.unlink()
+    return False
+
+
+def _fit_by_encoding(url: str, outdir: Path) -> list[Path]:
+    """No quality fits as it is (a long reel whose smallest version is still too big): shrink one to fit."""
+    files = [f for f in _ytdlp(url, outdir, "video_any", None) if f.suffix.lower() in VIDEO_EXT]
+    if files and all(_shrink(f) for f in files):
+        log.info("shrunk %s to fit", url)
+        return files
+    _clear(outdir)
+    return []
+
+
 def download(url: str, outdir: Path, fmt: str) -> list[Path]:
     """Video/audio via yt-dlp; if that finds nothing (image posts), extract the post's images as JPG."""
     _, kind, opt = FORMATS[fmt]
@@ -393,7 +438,12 @@ def download(url: str, outdir: Path, fmt: str) -> list[Path]:
             files = download_images(url, outdir)
         except Exception as e:  # best-effort; report the yt-dlp error instead
             log.info("image fallback failed: %s", e)
-    if not files and not err and kind == "video":  # nothing fits as video (a very long one): send just the sound
+    if not files and not err and kind == "video":  # nothing fits as it is: squeeze it to fit before settling for sound only
+        try:
+            files = _fit_by_encoding(url, outdir)
+        except Exception as e:
+            log.info("shrinking failed: %s", e)
+    if not files and not err and kind == "video":  # too long even for that: send just the sound
         try:
             files = _ytdlp(url, outdir, "audio_small", None)
         except Exception as e:
@@ -451,7 +501,7 @@ def _ytdlp_run(url: str, outdir: Path, kind: str, opt, failed: list | None = Non
         "outtmpl": str(outdir / "%(autonumber)02d_%(id)s.%(ext)s"),
         "noplaylist": bool(YOUTUBE_RE.search(url)),  # single video from watch?v=..&list=..
         "playlistend": 1 if site_of(url) == "tiktok" else 10,  # Instagram carousels / Twitter multi-video; a TikTok profile link gives one video, not ten
-        "max_filesize": MAX_BYTES,
+        "max_filesize": 400 * 1024 * 1024 if kind == "video_any" else MAX_BYTES,
         "logger": lg,
         "ignoreerrors": "only_download",  # one bad carousel item shouldn't drop the rest
         "restrictfilenames": True,
@@ -466,6 +516,11 @@ def _ytdlp_run(url: str, outdir: Path, kind: str, opt, failed: list | None = Non
     elif kind == "audio":
         opts["format"] = "bestaudio/best"
         opts["postprocessors"] = [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "0"}]
+    elif kind == "video_any":  # any size: the caller shrinks it to fit
+        opts["format"] = "bv*[height<=720]+ba/b[height<=720]/bv*+ba/b"
+        opts["format_sort"] = ["res", "vcodec:h264", "acodec:aac"]
+        opts["merge_output_format"] = "mp4"
+        opts["postprocessors"] = [{"key": "FFmpegVideoRemuxer", "preferedformat": "mp4"}]
     else:
         cap = f"[height<={opt}]" if opt else ""
         opts["format"] = f"bv*{cap}+ba/b{cap}/b"
@@ -876,6 +931,11 @@ async def catchup_loop(app: Application) -> None:
                     try:
                         if await run_download(app, msg, url, "best", "catch-up"):
                             pending_done(chat_id, msg_id, url)
+                    except BadRequest as e:  # the original message was deleted: nobody wants it any more
+                        log.info("dropping %s: %s", media_key(url), e)
+                        pending_done(chat_id, msg_id, url)
+                    except Exception:
+                        log.exception("catch-up of %s failed", media_key(url))
                     finally:
                         live.discard((chat_id, msg_id, url))
         except Exception:
