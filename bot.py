@@ -138,6 +138,26 @@ def _twitter_images(path: str) -> list[str]:
 _reddit_token: dict = {"value": None, "exp": 0.0}
 
 
+def cookies_cover(domain: str) -> bool:
+    """True if the cookies file has a login for this site (a file with only Instagram cookies doesn't help Reddit)."""
+    try:
+        return domain in Path(COOKIES).read_text() if COOKIES else False
+    except OSError:
+        return False
+
+
+def _site_cookies(domain: str) -> dict:
+    """The cookies file's entries for one site, as a plain dict for httpx."""
+    if not cookies_cover(domain):
+        return {}
+    jar = http.cookiejar.MozillaCookieJar(COOKIES)
+    try:
+        jar.load(ignore_discard=True, ignore_expires=True)
+    except (OSError, http.cookiejar.LoadError):
+        return {}
+    return {c.name: c.value for c in jar if domain in c.domain}
+
+
 def _reddit_json(path: str) -> list:
     """Post JSON via app-only OAuth when REDDIT_CLIENT_ID/SECRET are set (reliable), else the anonymous endpoint (often blocked)."""
     if REDDIT_ID and REDDIT_SECRET:
@@ -158,14 +178,14 @@ def _reddit_json(path: str) -> list:
         )
         r.raise_for_status()
         return r.json()
-    r = _get(f"https://old.reddit.com{path}.json?raw_json=1")
+    r = _get(f"https://old.reddit.com{path}.json?raw_json=1", cookies=_site_cookies("reddit.com"))
     if "json" not in r.headers.get("content-type", ""):
-        raise RuntimeError("Reddit blocked anonymous access; set REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET")
+        raise RuntimeError("Reddit blocked access; add Reddit API keys or fresh Reddit cookies")
     return r.json()
 
 
 def _reddit_post(url: str) -> dict:
-    final = httpx.head(url, headers={"User-Agent": UA}, follow_redirects=True, timeout=30).url  # resolves redd.it and /s/ links
+    final = httpx.head(url, headers={"User-Agent": UA}, cookies=_site_cookies("reddit.com"), follow_redirects=True, timeout=30).url  # resolves redd.it and /s/ links
     data = _reddit_json(final.path.rstrip("/"))
     post = data[0]["data"]["children"][0]["data"]
     return (post.get("crosspost_parent_list") or [post])[0]
